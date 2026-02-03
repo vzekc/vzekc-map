@@ -49,6 +49,77 @@ module VzekcMap
       render json: { locations: locations }
     end
 
+    # POST /vzekc-map/locations.json
+    #
+    # Add a new location for the current user
+    #
+    # @param lat [Float] Latitude
+    # @param lng [Float] Longitude
+    # @param zoom [Integer] Optional zoom level
+    def add_location
+      lat = params[:lat].to_f
+      lng = params[:lng].to_f
+      zoom = params[:zoom]&.to_i
+
+      # Validate coordinates
+      unless GeoParser.send(:valid_coordinates?, lat, lng)
+        return render json: { error: I18n.t("vzekc_map.errors.invalid_coordinates") }, status: 422
+      end
+
+      # Build new geo string
+      new_geo = zoom ? "geo:#{lat},#{lng}?z=#{zoom}" : "geo:#{lat},#{lng}"
+
+      # Get current geoinformation
+      current_value = current_user.custom_fields["Geoinformation"] || ""
+
+      # Append new location
+      new_value = current_value.blank? ? new_geo : "#{current_value} #{new_geo}"
+
+      # Save
+      current_user.custom_fields["Geoinformation"] = new_value
+      current_user.save_custom_fields
+
+      # Return updated coordinates
+      coordinates = GeoParser.parse(new_value)
+      render json: { coordinates: coordinates }
+    end
+
+    # DELETE /vzekc-map/locations/:index.json
+    #
+    # Delete a location for the current user by index
+    #
+    # @param index [Integer] The index of the location to delete (0-based)
+    def delete_location
+      index = params[:index].to_i
+
+      # Get current geoinformation
+      current_value = current_user.custom_fields["Geoinformation"] || ""
+      coordinates = GeoParser.parse(current_value)
+
+      # Validate index
+      if index < 0 || index >= coordinates.length
+        return render json: { error: I18n.t("vzekc_map.errors.invalid_location_index") }, status: 422
+      end
+
+      # Remove the location at index by rebuilding the geo string
+      # We need to work with the raw parts, not parsed coordinates
+      parts = current_value.strip.split(/\s+/)
+      valid_parts = parts.select { |part| GeoParser.parse(part).any? }
+
+      if index < valid_parts.length
+        valid_parts.delete_at(index)
+      end
+
+      # Save updated value
+      new_value = valid_parts.join(" ")
+      current_user.custom_fields["Geoinformation"] = new_value
+      current_user.save_custom_fields
+
+      # Return updated coordinates
+      coordinates = GeoParser.parse(new_value)
+      render json: { coordinates: coordinates }
+    end
+
     private
 
     # Ensure current user is a member of the configured group

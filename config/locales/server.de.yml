@@ -8,3 +8,5 @@ de:
   vzekc_map:
     errors:
       members_only: "Diese Seite ist nur für Vereinsmitglieder zugänglich."
+      invalid_coordinates: "Ungültige Koordinaten"
+      invalid_location_index: "Ungültiger Standort-Index"

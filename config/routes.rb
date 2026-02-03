@@ -2,6 +2,8 @@
 
 VzekcMap::Engine.routes.draw do
   get "/locations" => "map#locations"
+  post "/locations" => "map#add_location"
+  delete "/locations/:index" => "map#delete_location"
 end
 
 Discourse::Application.routes.draw do

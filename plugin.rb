@@ -14,6 +14,14 @@ register_asset "stylesheets/vzekc-map.scss"
 
 register_svg_icon "map"
 register_svg_icon "map-marker-alt"
+register_svg_icon "home"
+register_svg_icon "house"
+register_svg_icon "plus"
+register_svg_icon "times"
+register_svg_icon "xmark"
+register_svg_icon "crosshairs"
+register_svg_icon "location-crosshairs"
+register_svg_icon "globe"
 
 module ::VzekcMap
   PLUGIN_NAME = "vzekc-map"

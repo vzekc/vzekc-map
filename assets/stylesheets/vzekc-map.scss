@@ -37,6 +37,70 @@
     background: var(--danger-low);
   }
 
+  .member-map-adding-hint {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: var(--tertiary);
+    color: var(--secondary);
+    padding: 8px 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    animation: fadeIn 0.2s ease;
+  }
+
+  &.adding-mode .member-map-canvas {
+    cursor: crosshair;
+  }
+
+  .member-map-controls {
+    position: absolute;
+    bottom: 25px;
+    left: 10px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    .btn {
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--secondary);
+      border: 2px solid rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+      &:hover:not(:disabled) {
+        background: var(--primary-very-low);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      &.is-adding {
+        background: var(--tertiary);
+        color: var(--secondary);
+        border-color: var(--tertiary);
+      }
+
+      .d-icon {
+        margin: 0;
+      }
+    }
+  }
+
   .member-map-canvas {
     width: 100%;
     height: 600px;
@@ -45,51 +109,93 @@
   }
 }
 
-// Popup styles
-.member-map-popup {
-  .member-map-popup-link {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-    text-decoration: none;
-    color: var(--primary);
+// Custom marker styles
+.member-map-marker {
+  // Reset Leaflet's default icon styles
+  background: none !important;
+  border: none !important;
+}
 
-    &:hover {
-      .member-map-username {
-        text-decoration: underline;
-      }
-    }
-  }
+.member-map-marker-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, -100%);
+  position: relative;
+  cursor: pointer;
 
-  .member-map-avatar {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-  }
-
-  .member-map-user-info {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .member-map-username {
-    font-weight: bold;
-  }
-
-  .member-map-handle {
-    font-size: 0.85em;
-    color: var(--primary-medium);
+  &:hover {
+    z-index: 1000 !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
   }
 }
 
-// Override Leaflet styles for dark mode compatibility
-.leaflet-popup-content-wrapper {
-  background: var(--secondary);
-  color: var(--primary);
+// Delete button on user's own markers
+.member-map-marker-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #fff;
+  color: #dc3545; // red X
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+
+  svg {
+    width: 8px;
+    height: 8px;
+  }
+
+  &:hover {
+    color: #a71d2a; // darker red on hover
+  }
 }
 
-.leaflet-popup-tip {
-  background: var(--secondary);
+// Arrow pointing down (color set via inline style)
+.member-map-marker-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  // border-top-color is set inline to match label background
+}
+
+// Cluster icon styles (matching member marker color)
+.member-map-cluster-icon {
+  background: none !important;
+}
+
+.member-map-cluster {
+  width: 36px;
+  height: 36px;
+  background-color: #1f7a6d; // slightly darker teal than markers
+  border: 3px solid #2a9d8f; // same teal as markers
+  border-radius: 50%;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+
+  &:hover {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    transform: scale(1.1);
+  }
 }
 
 .leaflet-container {
@@ -102,5 +208,16 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
 }

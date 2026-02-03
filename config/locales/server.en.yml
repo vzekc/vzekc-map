@@ -8,3 +8,5 @@ en:
   vzekc_map:
     errors:
       members_only: "This page is only accessible to association members."
+      invalid_coordinates: "Invalid coordinates"
+      invalid_location_index: "Invalid location index"
