@@ -5,8 +5,11 @@ en:
     vzekc_map_default_center_lat: "Default latitude for map centering"
     vzekc_map_default_center_lng: "Default longitude for map centering"
     vzekc_map_default_zoom: "Default map zoom level"
+    vzekc_map_poi_enabled: "Enable Points of Interest (POI) feature"
+    vzekc_map_poi_category_id: "Category for POI topics"
   vzekc_map:
     errors:
       members_only: "This page is only accessible to association members."
       invalid_coordinates: "Invalid coordinates"
       invalid_location_index: "Invalid location index"
+      poi_requires_location: "POI topics must be created via the map with a location"

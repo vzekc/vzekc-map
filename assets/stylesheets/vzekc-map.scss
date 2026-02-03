@@ -229,8 +229,109 @@
       }
     }
 
-    .member-map-home-container {
+    .member-map-home-container,
+    .member-map-layer-container,
+    .member-map-add-container {
       position: relative;
+    }
+
+    .member-map-layer-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 8px;
+      background: var(--secondary);
+      border: 1px solid var(--primary-low);
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      min-width: 150px;
+      z-index: 1001;
+      animation: pickerFadeIn 0.15s ease;
+    }
+
+    .member-map-layer-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background-color 0.1s;
+
+      &:hover {
+        background: var(--primary-very-low);
+      }
+
+      &:first-child {
+        border-radius: 4px 4px 0 0;
+      }
+
+      &:last-child {
+        border-radius: 0 0 4px 4px;
+      }
+
+      &:not(:last-child) {
+        border-bottom: 1px solid var(--primary-low);
+      }
+
+      input[type="checkbox"] {
+        margin: 0;
+      }
+
+      span {
+        color: var(--primary);
+      }
+    }
+
+    .member-map-add-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: var(--secondary);
+      border: 1px solid var(--primary-low);
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      min-width: 180px;
+      z-index: 1001;
+      animation: pickerFadeIn 0.15s ease;
+    }
+
+    .member-map-add-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 10px 12px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      text-align: left;
+      color: var(--primary);
+      font-size: 13px;
+      transition: background-color 0.1s;
+
+      &:hover {
+        background: var(--primary-very-low);
+      }
+
+      &:first-child {
+        border-radius: 4px 4px 0 0;
+      }
+
+      &:last-child {
+        border-radius: 0 0 4px 4px;
+      }
+
+      &:not(:last-child) {
+        border-bottom: 1px solid var(--primary-low);
+      }
+
+      .d-icon {
+        color: var(--primary-medium);
+        flex-shrink: 0;
+      }
     }
 
     .member-map-location-picker {
@@ -366,6 +467,45 @@
   // border-top-color is set inline to match label background
 }
 
+// Search result marker (small red pin)
+.search-result-marker {
+  background: none !important;
+  border: none !important;
+}
+
+.search-result-marker-pin {
+  position: relative;
+  width: 16px;
+  height: 24px;
+
+  // Pin shape using pseudo-element
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 16px;
+    height: 16px;
+    background: #e63946; // red
+    border: 2px solid #c1121f;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  // Inner circle
+  &::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border-radius: 50%;
+  }
+}
+
 // Cluster icon styles (matching member marker color)
 .member-map-cluster-icon {
   background: none !important;
@@ -389,6 +529,92 @@
   &:hover {
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
     transform: scale(1.1);
+  }
+}
+
+// POI marker styles (purple)
+.poi-map-marker {
+  background: none !important;
+  border: none !important;
+}
+
+.poi-map-marker-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, -100%);
+  position: relative;
+  cursor: pointer;
+
+  &:hover {
+    z-index: 1000 !important;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+  }
+}
+
+.poi-map-marker-arrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+}
+
+// POI cluster styles (purple)
+.poi-map-cluster-icon {
+  background: none !important;
+}
+
+.poi-map-cluster {
+  width: 36px;
+  height: 36px;
+  background-color: #6b2dbd; // slightly darker purple
+  border: 3px solid #8338ec; // purple
+  border-radius: 50%;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+
+  &:hover {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+    transform: scale(1.1);
+  }
+}
+
+// POI popup
+.poi-popup {
+  min-width: 150px;
+
+  strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  p {
+    margin: 0 0 8px;
+    color: var(--primary-medium);
+    font-size: 13px;
+  }
+
+  a {
+    font-weight: 500;
+    color: var(--tertiary);
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 

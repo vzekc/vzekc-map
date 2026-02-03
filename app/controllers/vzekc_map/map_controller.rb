@@ -127,6 +127,52 @@ module VzekcMap
       render json: { coordinates: coordinates }
     end
 
+    # GET /vzekc-map/pois.json
+    #
+    # Returns all POI topics from the configured category with coordinates
+    #
+    # @return [JSON] {
+    #   pois: [
+    #     {
+    #       topic_id, title, slug,
+    #       coordinates: { lat, lng, zoom, name },
+    #       user: { id, username, avatar_template }
+    #     }
+    #   ]
+    # }
+    def pois
+      return render json: { pois: [] } unless SiteSetting.vzekc_map_poi_enabled
+
+      category_id = SiteSetting.vzekc_map_poi_category_id
+      return render json: { pois: [] } if category_id.blank?
+
+      topics = Topic.where(category_id: category_id)
+                    .where(deleted_at: nil)
+                    .includes(:user)
+
+      pois = topics.filter_map do |topic|
+        coords_str = topic.custom_fields["vzekc_map_coordinates"]
+        next unless coords_str.present?
+
+        coords = GeoParser.parse(coords_str).first
+        next unless coords
+
+        {
+          topic_id: topic.id,
+          title: topic.title,
+          slug: topic.slug,
+          coordinates: coords,
+          user: {
+            id: topic.user.id,
+            username: topic.user.username,
+            avatar_template: topic.user.avatar_template
+          }
+        }
+      end
+
+      render json: { pois: pois }
+    end
+
     private
 
     # Ensure current user is a member of the configured group

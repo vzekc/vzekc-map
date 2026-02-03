@@ -11,8 +11,9 @@ import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
 import icon from "discourse/helpers/d-icon";
 import getURL from "discourse/lib/get-url";
-import { eq, not } from "truth-helpers";
+import { eq, not, and } from "truth-helpers";
 import { i18n } from "discourse-i18n";
+import Composer from "discourse/models/composer";
 
 // Leaflet CDN URLs
 const LEAFLET_CSS_URL = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
@@ -27,18 +28,17 @@ const MARKER_CLUSTER_JS_URL =
 // Storage key for map state
 const MAP_STATE_KEY = "vzekc-map-state";
 
-// Marker colors by POI type (for future extensibility)
+// Marker colors
 const MARKER_COLORS = {
   member: "#2a9d8f", // teal for members
-  // Future POI types can use different colors:
-  // museum: "#8338ec",
-  // event: "#e63946",
+  poi: "#8338ec",    // purple for POIs
 };
 
 export default class MemberMap extends Component {
   @service siteSettings;
   @service currentUser;
   @service dialog;
+  @service composer;
 
   @tracked loading = true;
   @tracked error = null;
@@ -51,14 +51,25 @@ export default class MemberMap extends Component {
   @tracked searchResults = [];
   @tracked isSearching = false;
   @tracked showSearchResults = false;
+  @tracked showLayerMenu = false;
+  @tracked layerMembers = true;
+  @tracked layerPois = true;
+  @tracked pois = [];
+  @tracked showAddMenu = false;
+  @tracked addingPoi = false;
 
   map = null;
   markerCluster = null;
+  poiCluster = null;
+  searchMarker = null;
+  searchMarkerCleanupHandler = null;
   mapClickHandler = null;
   escapeHandler = null;
   locationPickerClickOutsideHandler = null;
   searchDebounceTimer = null;
   searchClickOutsideHandler = null;
+  layerMenuClickOutsideHandler = null;
+  addMenuClickOutsideHandler = null;
 
   get defaultCenter() {
     return [
@@ -91,17 +102,29 @@ export default class MemberMap extends Component {
     return userLoc?.coordinates || [];
   }
 
+  get poiEnabled() {
+    return this.siteSettings.vzekc_map_poi_enabled && this.siteSettings.vzekc_map_poi_category_id;
+  }
+
   @action
   async setupMap(element) {
     try {
       this.locations = this.args.locations || [];
       this.hasHomeLocation = !!this.currentUserLocation;
 
+      // Restore layer visibility from session storage
+      this.restoreLayerState();
+
       await this.loadLeaflet();
       this.initializeMap(element);
       this.restoreMapState();
       this.addMarkers();
+      await this.loadPois();
       this.setupMapStateTracking();
+
+      // Check for POI parameter in URL and center map if present
+      this.handlePoiUrlParameter();
+
       this.loading = false;
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -111,12 +134,37 @@ export default class MemberMap extends Component {
     }
   }
 
+  handlePoiUrlParameter() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const poiParam = urlParams.get("poi");
+
+    if (poiParam) {
+      const parts = poiParam.split(",");
+      if (parts.length >= 2) {
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+        const zoom = parts.length >= 3 ? parseInt(parts[2], 10) : 15;
+
+        if (!isNaN(lat) && !isNaN(lng)) {
+          this.map.setView([lat, lng], zoom);
+
+          // Clear the URL parameter without reloading
+          const url = new URL(window.location);
+          url.searchParams.delete("poi");
+          window.history.replaceState({}, "", url);
+        }
+      }
+    }
+  }
+
   @action
   destroyMap() {
     this.saveMapState();
     this.exitAddingMode();
     this.cleanupLocationPickerClickOutside();
     this.cleanupSearchClickOutside();
+    this.cleanupLayerMenuClickOutside();
+    this.cleanupAddMenuClickOutside();
     if (this.searchDebounceTimer) {
       clearTimeout(this.searchDebounceTimer);
       this.searchDebounceTimer = null;
@@ -141,8 +189,27 @@ export default class MemberMap extends Component {
       lat: center.lat,
       lng: center.lng,
       zoom: zoom,
+      layerMembers: this.layerMembers,
+      layerPois: this.layerPois,
     };
     sessionStorage.setItem(MAP_STATE_KEY, JSON.stringify(state));
+  }
+
+  restoreLayerState() {
+    const savedState = sessionStorage.getItem(MAP_STATE_KEY);
+    if (savedState) {
+      try {
+        const state = JSON.parse(savedState);
+        if (typeof state.layerMembers === "boolean") {
+          this.layerMembers = state.layerMembers;
+        }
+        if (typeof state.layerPois === "boolean") {
+          this.layerPois = state.layerPois;
+        }
+      } catch (e) {
+        // Ignore invalid state
+      }
+    }
   }
 
   restoreMapState() {
@@ -333,6 +400,23 @@ export default class MemberMap extends Component {
       }
     });
 
+    // Search POIs by title
+    if (this.poiEnabled) {
+      this.pois.forEach((poi) => {
+        if (poi.title.toLowerCase().includes(queryLower)) {
+          results.push({
+            type: "poi",
+            label: poi.title,
+            sublabel: poi.coordinates.name || `${poi.coordinates.lat.toFixed(4)}, ${poi.coordinates.lng.toFixed(4)}`,
+            lat: poi.coordinates.lat,
+            lng: poi.coordinates.lng,
+            zoom: poi.coordinates.zoom || 15,
+            topicUrl: `/t/${poi.slug}/${poi.topic_id}`,
+          });
+        }
+      });
+    }
+
     // Search places via Nominatim
     try {
       const placeResults = await this.searchPlaces(query);
@@ -397,19 +481,70 @@ export default class MemberMap extends Component {
       const L = window.L;
       const targetLatLng = L.latLng(result.lat, result.lng);
 
+      // Remove any existing search marker
+      this.removeSearchMarker();
+
+      // Determine zoom level - ensure minimum of 15 for adding locations
+      const minZoomForAdding = 15;
+      let targetZoom = result.zoom || 15;
+
       if (result.type === "member") {
-        // For members, use smart zoom to show nearest neighbor
+        // For members, use smart zoom but ensure minimum zoom
         const nearestNeighbor = this.findNearestNeighborExcluding(targetLatLng, result.label.slice(1));
         if (nearestNeighbor) {
           const bounds = L.latLngBounds([targetLatLng, nearestNeighbor]);
-          this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+          this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: minZoomForAdding });
+          // After fitBounds, check if zoom is too low
+          if (this.map.getZoom() < minZoomForAdding) {
+            this.map.setView(targetLatLng, minZoomForAdding);
+          }
         } else {
-          this.map.setView(targetLatLng, result.zoom || 12);
+          this.map.setView(targetLatLng, Math.max(targetZoom, minZoomForAdding));
         }
+      } else if (result.type === "poi") {
+        // For POIs, zoom in appropriately
+        this.map.setView(targetLatLng, Math.max(targetZoom, minZoomForAdding));
       } else {
-        // For places, just zoom to the location
-        this.map.setView(targetLatLng, result.zoom || 13);
+        // For places, zoom to the location with minimum zoom
+        this.map.setView(targetLatLng, Math.max(targetZoom, minZoomForAdding));
       }
+
+      // Add search marker to indicate the location
+      this.addSearchMarker(targetLatLng);
+    }
+  }
+
+  addSearchMarker(latLng) {
+    const L = window.L;
+
+    // Create a small red pin marker
+    const markerIcon = L.divIcon({
+      className: "search-result-marker",
+      html: `<div class="search-result-marker-pin"></div>`,
+      iconSize: [16, 24],
+      iconAnchor: [8, 24],
+    });
+
+    this.searchMarker = L.marker(latLng, { icon: markerIcon });
+    this.searchMarker.addTo(this.map);
+
+    // Remove marker when map is moved or zoomed
+    this.searchMarkerCleanupHandler = () => {
+      this.removeSearchMarker();
+    };
+    this.map.once("movestart", this.searchMarkerCleanupHandler);
+    this.map.once("zoomstart", this.searchMarkerCleanupHandler);
+  }
+
+  removeSearchMarker() {
+    if (this.searchMarker) {
+      this.map.removeLayer(this.searchMarker);
+      this.searchMarker = null;
+    }
+    if (this.searchMarkerCleanupHandler) {
+      this.map.off("movestart", this.searchMarkerCleanupHandler);
+      this.map.off("zoomstart", this.searchMarkerCleanupHandler);
+      this.searchMarkerCleanupHandler = null;
     }
   }
 
@@ -462,19 +597,192 @@ export default class MemberMap extends Component {
     }
   }
 
+  // Layer control methods
   @action
-  resetView() {
-    if (this.map) {
-      this.map.setView(this.defaultCenter, this.defaultZoom);
+  toggleLayerMenu() {
+    this.showLayerMenu = !this.showLayerMenu;
+    if (this.showLayerMenu) {
+      this.setupLayerMenuClickOutside();
+    } else {
+      this.cleanupLayerMenuClickOutside();
     }
   }
 
   @action
-  toggleAddLocation() {
+  hideLayerMenu() {
+    this.showLayerMenu = false;
+    this.cleanupLayerMenuClickOutside();
+  }
+
+  setupLayerMenuClickOutside() {
+    this.layerMenuClickOutsideHandler = (e) => {
+      if (!e.target.closest(".member-map-layer-container")) {
+        this.hideLayerMenu();
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener("click", this.layerMenuClickOutsideHandler);
+    }, 0);
+  }
+
+  cleanupLayerMenuClickOutside() {
+    if (this.layerMenuClickOutsideHandler) {
+      document.removeEventListener("click", this.layerMenuClickOutsideHandler);
+      this.layerMenuClickOutsideHandler = null;
+    }
+  }
+
+  @action
+  toggleMemberLayer(event) {
+    this.layerMembers = event.target.checked;
+    this.updateLayerVisibility();
+    this.saveMapState();
+  }
+
+  @action
+  togglePoiLayer(event) {
+    this.layerPois = event.target.checked;
+    this.updateLayerVisibility();
+    this.saveMapState();
+  }
+
+  updateLayerVisibility() {
+    if (!this.map) return;
+
+    if (this.markerCluster) {
+      if (this.layerMembers) {
+        this.map.addLayer(this.markerCluster);
+      } else {
+        this.map.removeLayer(this.markerCluster);
+      }
+    }
+
+    if (this.poiCluster) {
+      if (this.layerPois) {
+        this.map.addLayer(this.poiCluster);
+      } else {
+        this.map.removeLayer(this.poiCluster);
+      }
+    }
+  }
+
+  // POI loading and display
+  async loadPois() {
+    if (!this.poiEnabled) return;
+
+    try {
+      const result = await ajax("/vzekc-map/pois.json");
+      this.pois = result.pois || [];
+      this.addPoiMarkers();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to load POIs:", e);
+    }
+  }
+
+  addPoiMarkers() {
+    if (!this.poiCluster || !this.pois.length) return;
+
+    const L = window.L;
+    const poiColor = MARKER_COLORS.poi;
+
+    this.pois.forEach((poi) => {
+      const markerIcon = L.divIcon({
+        className: "poi-map-marker",
+        html: `
+          <div class="poi-map-marker-label" style="background-color: ${poiColor}">
+            ${this.escapeHtml(poi.title)}
+            <span class="poi-map-marker-arrow" style="border-top-color: ${poiColor}"></span>
+          </div>
+        `,
+        iconSize: null,
+        iconAnchor: [0, 0],
+      });
+
+      const marker = L.marker([poi.coordinates.lat, poi.coordinates.lng], { icon: markerIcon });
+      const topicUrl = getURL(`/t/${poi.slug}/${poi.topic_id}`);
+
+      // Show popup on click with POI info
+      marker.bindPopup(`
+        <div class="poi-popup">
+          <strong>${this.escapeHtml(poi.title)}</strong>
+          <p>by @${this.escapeHtml(poi.user.username)}</p>
+          <a href="${topicUrl}">Open discussion</a>
+        </div>
+      `);
+
+      this.poiCluster.addLayer(marker);
+    });
+
+    if (this.layerPois) {
+      this.map.addLayer(this.poiCluster);
+    }
+  }
+
+  // Add menu methods
+  @action
+  toggleAddMenu() {
     if (this.isAddingLocation) {
       this.exitAddingMode();
+      return;
+    }
+
+    // If POI is not enabled, directly start adding home location
+    if (!this.poiEnabled) {
+      this.startAddHomeLocation();
+      return;
+    }
+
+    this.showAddMenu = !this.showAddMenu;
+    if (this.showAddMenu) {
+      this.setupAddMenuClickOutside();
     } else {
-      this.enterAddingMode();
+      this.cleanupAddMenuClickOutside();
+    }
+  }
+
+  @action
+  hideAddMenu() {
+    this.showAddMenu = false;
+    this.cleanupAddMenuClickOutside();
+  }
+
+  setupAddMenuClickOutside() {
+    this.addMenuClickOutsideHandler = (e) => {
+      if (!e.target.closest(".member-map-add-container")) {
+        this.hideAddMenu();
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener("click", this.addMenuClickOutsideHandler);
+    }, 0);
+  }
+
+  cleanupAddMenuClickOutside() {
+    if (this.addMenuClickOutsideHandler) {
+      document.removeEventListener("click", this.addMenuClickOutsideHandler);
+      this.addMenuClickOutsideHandler = null;
+    }
+  }
+
+  @action
+  startAddHomeLocation() {
+    this.hideAddMenu();
+    this.addingPoi = false;
+    this.enterAddingMode();
+  }
+
+  @action
+  startAddPoi() {
+    this.hideAddMenu();
+    this.addingPoi = true;
+    this.enterAddingMode();
+  }
+
+  @action
+  resetView() {
+    if (this.map) {
+      this.map.setView(this.defaultCenter, this.defaultZoom);
     }
   }
 
@@ -490,7 +798,11 @@ export default class MemberMap extends Component {
 
     // Listen for map clicks
     this.mapClickHandler = async (e) => {
-      await this.saveNewLocation(e.latlng.lat, e.latlng.lng);
+      if (this.addingPoi) {
+        await this.addPoi(e.latlng.lat, e.latlng.lng);
+      } else {
+        await this.saveNewLocation(e.latlng.lat, e.latlng.lng);
+      }
     };
     this.map.on("click", this.mapClickHandler);
 
@@ -505,6 +817,7 @@ export default class MemberMap extends Component {
 
   exitAddingMode() {
     this.isAddingLocation = false;
+    this.addingPoi = false;
 
     if (this.map) {
       this.map.getContainer().style.cursor = "";
@@ -519,6 +832,85 @@ export default class MemberMap extends Component {
       document.removeEventListener("keydown", this.escapeHandler);
       this.escapeHandler = null;
     }
+  }
+
+  async addPoi(lat, lng) {
+    const zoom = this.map.getZoom();
+    const geoUri = `geo:${lat},${lng}?z=${zoom}`;
+
+    this.exitAddingMode();
+
+    // Reverse geocode to get location name suggestion
+    let suggestedTitle = `POI at ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    try {
+      const geocodeResult = await this.reverseGeocode(lat, lng);
+      if (geocodeResult?.name) {
+        suggestedTitle = geocodeResult.name;
+      }
+    } catch (e) {
+      // Use default title if geocoding fails
+    }
+
+    // Build map link with coordinates
+    const mapLink = `/member-map?poi=${lat},${lng},${zoom}`;
+
+    // Build template using i18n
+    const t = (key) => i18n(`vzekc_map.poi_template.${key}`);
+    const template = `${t("location_heading")}
+[${t("view_on_map")}](${mapLink})
+
+${t("description_heading")}
+${t("description_hint")}
+
+${t("details_heading")}
+${t("details_hint")}
+
+${t("contact_heading")}
+${t("contact_hint")}
+
+${t("warning")}
+`;
+
+    // Use a unique draft key to avoid conflicts with other drafts
+    const draftKey = `poi_${Date.now()}`;
+
+    this.composer.open({
+      action: Composer.CREATE_TOPIC,
+      categoryId: parseInt(this.siteSettings.vzekc_map_poi_category_id, 10),
+      draftKey: draftKey,
+      title: suggestedTitle,
+      topicBody: template,
+      skipDraftCheck: true,
+    });
+  }
+
+  async reverseGeocode(lat, lng) {
+    const url = new URL("https://nominatim.openstreetmap.org/reverse");
+    url.searchParams.set("lat", lat.toString());
+    url.searchParams.set("lon", lng.toString());
+    url.searchParams.set("format", "json");
+    url.searchParams.set("addressdetails", "1");
+
+    const response = await fetch(url, {
+      headers: {
+        "Accept-Language": "de,en",
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    if (data?.address) {
+      const parts = [];
+      if (data.address.road) parts.push(data.address.road);
+      if (data.address.city || data.address.town || data.address.village) {
+        parts.push(data.address.city || data.address.town || data.address.village);
+      }
+      return { name: parts.join(", ") || data.display_name?.split(",").slice(0, 2).join(",") };
+    }
+    return null;
   }
 
   async saveNewLocation(lat, lng) {
@@ -700,7 +1092,23 @@ export default class MemberMap extends Component {
       },
     });
 
-    this.map.addLayer(this.markerCluster);
+    if (this.layerMembers) {
+      this.map.addLayer(this.markerCluster);
+    }
+
+    // Initialize POI cluster group with different style
+    this.poiCluster = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 50,
+      iconCreateFunction: (cluster) => {
+        const count = cluster.getChildCount();
+        return L.divIcon({
+          html: `<div class="poi-map-cluster">${count}</div>`,
+          className: "poi-map-cluster-icon",
+          iconSize: L.point(36, 36),
+        });
+      },
+    });
 
     // Use event delegation for delete buttons - captures clicks before marker events
     this.deleteClickHandler = (e) => {
@@ -795,7 +1203,11 @@ export default class MemberMap extends Component {
       {{#if this.isAddingLocation}}
         <div class="member-map-adding-hint">
           {{icon "location-crosshairs"}}
-          {{i18n "vzekc_map.click_to_add"}}
+          {{#if this.addingPoi}}
+            {{i18n "vzekc_map.click_to_add_poi"}}
+          {{else}}
+            {{i18n "vzekc_map.click_to_add"}}
+          {{/if}}
         </div>
       {{/if}}
 
@@ -835,6 +1247,8 @@ export default class MemberMap extends Component {
                   >
                     {{#if (eq result.type "member")}}
                       {{icon "user"}}
+                    {{else if (eq result.type "poi")}}
+                      {{icon "map-pin"}}
                     {{else}}
                       {{icon "map-marker-alt"}}
                     {{/if}}
@@ -856,6 +1270,36 @@ export default class MemberMap extends Component {
         </div>
 
         <div class="member-map-controls">
+          {{#if this.poiEnabled}}
+            <div class="member-map-layer-container">
+              <DButton
+                @action={{this.toggleLayerMenu}}
+                @icon="layer-group"
+                @title="vzekc_map.layers"
+                class="btn-default member-map-control-btn"
+              />
+              {{#if this.showLayerMenu}}
+                <div class="member-map-layer-menu">
+                  <label class="member-map-layer-option">
+                    <input
+                      type="checkbox"
+                      checked={{this.layerMembers}}
+                      {{on "change" this.toggleMemberLayer}}
+                    />
+                    <span>{{i18n "vzekc_map.layer_members"}}</span>
+                  </label>
+                  <label class="member-map-layer-option">
+                    <input
+                      type="checkbox"
+                      checked={{this.layerPois}}
+                      {{on "change" this.togglePoiLayer}}
+                    />
+                    <span>{{i18n "vzekc_map.layer_pois"}}</span>
+                  </label>
+                </div>
+              {{/if}}
+            </div>
+          {{/if}}
           <DButton
             @action={{this.resetView}}
             @icon="globe"
@@ -885,12 +1329,34 @@ export default class MemberMap extends Component {
               </div>
             {{/if}}
           </div>
-          <DButton
-            @action={{this.toggleAddLocation}}
-            @icon={{if this.isAddingLocation "xmark" "plus"}}
-            @title={{if this.isAddingLocation "vzekc_map.cancel_add" "vzekc_map.add_location"}}
-            class="btn-default member-map-control-btn {{if this.isAddingLocation 'is-adding'}}"
-          />
+          <div class="member-map-add-container">
+            <DButton
+              @action={{this.toggleAddMenu}}
+              @icon={{if this.isAddingLocation "xmark" "plus"}}
+              @title={{if this.isAddingLocation "vzekc_map.cancel_add" "vzekc_map.add_location"}}
+              class="btn-default member-map-control-btn {{if this.isAddingLocation 'is-adding'}}"
+            />
+            {{#if (and this.showAddMenu this.poiEnabled)}}
+              <div class="member-map-add-menu">
+                <button
+                  type="button"
+                  class="member-map-add-option"
+                  {{on "click" this.startAddHomeLocation}}
+                >
+                  {{icon "house"}}
+                  <span>{{i18n "vzekc_map.add_home_location"}}</span>
+                </button>
+                <button
+                  type="button"
+                  class="member-map-add-option"
+                  {{on "click" this.startAddPoi}}
+                >
+                  {{icon "map-pin"}}
+                  <span>{{i18n "vzekc_map.add_poi"}}</span>
+                </button>
+              </div>
+            {{/if}}
+          </div>
         </div>
       </div>
 

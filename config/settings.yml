@@ -20,3 +20,10 @@ vzekc_map:
     min: 1
     max: 18
     client: true
+  vzekc_map_poi_enabled:
+    default: false
+    client: true
+  vzekc_map_poi_category_id:
+    default: ""
+    type: category
+    client: true

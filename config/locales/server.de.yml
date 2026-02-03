@@ -5,8 +5,11 @@ de:
     vzekc_map_default_center_lat: "Standard-Breitengrad für die Kartenzentrierung"
     vzekc_map_default_center_lng: "Standard-Längengrad für die Kartenzentrierung"
     vzekc_map_default_zoom: "Standard-Zoomstufe der Karte"
+    vzekc_map_poi_enabled: "Points of Interest (POI) Funktion aktivieren"
+    vzekc_map_poi_category_id: "Kategorie für POI-Themen"
   vzekc_map:
     errors:
       members_only: "Diese Seite ist nur für Vereinsmitglieder zugänglich."
       invalid_coordinates: "Ungültige Koordinaten"
       invalid_location_index: "Ungültiger Standort-Index"
+      poi_requires_location: "POI-Themen müssen über die Karte mit einem Standort erstellt werden"
