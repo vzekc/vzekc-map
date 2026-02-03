@@ -86,6 +86,9 @@ module VzekcMap
       current_user.custom_fields["Geoinformation"] = new_value
       current_user.save_custom_fields
 
+      # Sync to WoltLab
+      WoltlabSync.sync_location(current_user)
+
       # Return updated coordinates
       coordinates = GeoParser.parse(new_value)
       render json: { coordinates: coordinates }
@@ -121,6 +124,9 @@ module VzekcMap
       new_value = valid_parts.join(" ")
       current_user.custom_fields["Geoinformation"] = new_value
       current_user.save_custom_fields
+
+      # Sync to WoltLab
+      WoltlabSync.sync_location(current_user)
 
       # Return updated coordinates
       coordinates = GeoParser.parse(new_value)

@@ -35,6 +35,7 @@ require_relative "lib/vzekc_map/engine"
 require_relative "lib/vzekc_map/geo_parser"
 require_relative "lib/vzekc_map/geocoder"
 require_relative "lib/vzekc_map/member_checker"
+require_relative "lib/vzekc_map/woltlab_sync"
 
 after_initialize do
   # Register custom route for member-map page

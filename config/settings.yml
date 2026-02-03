@@ -27,3 +27,15 @@ vzekc_map:
     default: ""
     type: category
     client: true
+  vzekc_map_woltlab_sync_enabled:
+    default: false
+    client: false
+  vzekc_map_woltlab_sync_url:
+    default: ""
+    type: string
+    client: false
+  vzekc_map_woltlab_sync_secret:
+    default: ""
+    type: string
+    secret: true
+    client: false

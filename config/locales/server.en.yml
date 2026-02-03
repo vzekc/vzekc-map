@@ -7,6 +7,9 @@ en:
     vzekc_map_default_zoom: "Default map zoom level"
     vzekc_map_poi_enabled: "Enable Points of Interest (POI) feature"
     vzekc_map_poi_category_id: "Category for POI topics"
+    vzekc_map_woltlab_sync_enabled: "Sync location changes back to WoltLab"
+    vzekc_map_woltlab_sync_url: "WoltLab sync endpoint URL"
+    vzekc_map_woltlab_sync_secret: "WoltLab sync API secret"
   vzekc_map:
     errors:
       members_only: "This page is only accessible to association members."

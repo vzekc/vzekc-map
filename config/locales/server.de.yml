@@ -7,6 +7,9 @@ de:
     vzekc_map_default_zoom: "Standard-Zoomstufe der Karte"
     vzekc_map_poi_enabled: "Points of Interest (POI) Funktion aktivieren"
     vzekc_map_poi_category_id: "Kategorie für POI-Themen"
+    vzekc_map_woltlab_sync_enabled: "Standortänderungen zu WoltLab synchronisieren"
+    vzekc_map_woltlab_sync_url: "WoltLab Sync-Endpunkt URL"
+    vzekc_map_woltlab_sync_secret: "WoltLab Sync API-Schlüssel"
   vzekc_map:
     errors:
       members_only: "Diese Seite ist nur für Vereinsmitglieder zugänglich."
