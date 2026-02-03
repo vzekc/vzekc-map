@@ -11,7 +11,7 @@ import { ajax } from "discourse/lib/ajax";
 import { popupAjaxError } from "discourse/lib/ajax-error";
 import icon from "discourse/helpers/d-icon";
 import getURL from "discourse/lib/get-url";
-import { not } from "truth-helpers";
+import { eq, not } from "truth-helpers";
 import { i18n } from "discourse-i18n";
 
 // Leaflet CDN URLs
@@ -47,12 +47,18 @@ export default class MemberMap extends Component {
   @tracked isAddingLocation = false;
   @tracked isSavingLocation = false;
   @tracked showLocationPicker = false;
+  @tracked searchQuery = "";
+  @tracked searchResults = [];
+  @tracked isSearching = false;
+  @tracked showSearchResults = false;
 
   map = null;
   markerCluster = null;
   mapClickHandler = null;
   escapeHandler = null;
   locationPickerClickOutsideHandler = null;
+  searchDebounceTimer = null;
+  searchClickOutsideHandler = null;
 
   get defaultCenter() {
     return [
@@ -110,6 +116,11 @@ export default class MemberMap extends Component {
     this.saveMapState();
     this.exitAddingMode();
     this.cleanupLocationPickerClickOutside();
+    this.cleanupSearchClickOutside();
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = null;
+    }
     if (this.deleteClickHandler && this.map) {
       this.map.getContainer().removeEventListener("click", this.deleteClickHandler, true);
       this.deleteClickHandler = null;
@@ -261,6 +272,197 @@ export default class MemberMap extends Component {
   }
 
   @action
+  onSearchInput(event) {
+    const query = event.target.value;
+    this.searchQuery = query;
+
+    // Clear previous timer
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+    }
+
+    if (query.length < 2) {
+      this.searchResults = [];
+      this.showSearchResults = false;
+      return;
+    }
+
+    // Debounce search
+    this.searchDebounceTimer = setTimeout(() => {
+      this.performSearch(query);
+    }, 300);
+  }
+
+  @action
+  onSearchFocus() {
+    if (this.searchQuery.length >= 2 && this.searchResults.length > 0) {
+      this.showSearchResults = true;
+      this.setupSearchClickOutside();
+    }
+  }
+
+  @action
+  onSearchKeydown(event) {
+    if (event.key === "Escape") {
+      this.hideSearchResults();
+      event.target.blur();
+    }
+  }
+
+  async performSearch(query) {
+    this.isSearching = true;
+    this.showSearchResults = true;
+    this.setupSearchClickOutside();
+
+    const results = [];
+    const queryLower = query.toLowerCase();
+
+    // Search members by username - include all locations for each matching user
+    this.locations.forEach((location) => {
+      if (location.user.username.toLowerCase().includes(queryLower)) {
+        location.coordinates?.forEach((coord) => {
+          results.push({
+            type: "member",
+            label: `@${location.user.username}`,
+            sublabel: coord.name || `${coord.lat.toFixed(4)}, ${coord.lng.toFixed(4)}`,
+            lat: coord.lat,
+            lng: coord.lng,
+            zoom: coord.zoom,
+          });
+        });
+      }
+    });
+
+    // Search places via Nominatim
+    try {
+      const placeResults = await this.searchPlaces(query);
+      results.push(...placeResults);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("Place search failed:", e);
+    }
+
+    this.searchResults = results;
+    this.isSearching = false;
+  }
+
+  async searchPlaces(query) {
+    const url = new URL("https://nominatim.openstreetmap.org/search");
+    url.searchParams.set("q", query);
+    url.searchParams.set("format", "json");
+    url.searchParams.set("limit", "5");
+    url.searchParams.set("addressdetails", "1");
+    // Bias towards Germany/Europe
+    url.searchParams.set("viewbox", "-10,35,30,60");
+    url.searchParams.set("bounded", "0");
+
+    const response = await fetch(url, {
+      headers: {
+        "Accept-Language": "de,en",
+      },
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = await response.json();
+    return data.map((item) => ({
+      type: "place",
+      label: item.display_name.split(",").slice(0, 2).join(","),
+      sublabel: item.display_name.split(",").slice(2, 4).join(",").trim(),
+      lat: parseFloat(item.lat),
+      lng: parseFloat(item.lon),
+      zoom: this.getZoomForPlaceType(item.type, item.class),
+    }));
+  }
+
+  getZoomForPlaceType(type, placeClass) {
+    // Return appropriate zoom level based on place type
+    if (type === "house" || type === "building") return 18;
+    if (type === "street" || type === "road") return 16;
+    if (type === "suburb" || type === "neighbourhood") return 14;
+    if (type === "city" || type === "town") return 12;
+    if (type === "county" || type === "state") return 9;
+    if (placeClass === "boundary") return 10;
+    return 13;
+  }
+
+  @action
+  selectSearchResult(result) {
+    this.hideSearchResults();
+    this.searchQuery = "";
+
+    if (this.map) {
+      const L = window.L;
+      const targetLatLng = L.latLng(result.lat, result.lng);
+
+      if (result.type === "member") {
+        // For members, use smart zoom to show nearest neighbor
+        const nearestNeighbor = this.findNearestNeighborExcluding(targetLatLng, result.label.slice(1));
+        if (nearestNeighbor) {
+          const bounds = L.latLngBounds([targetLatLng, nearestNeighbor]);
+          this.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        } else {
+          this.map.setView(targetLatLng, result.zoom || 12);
+        }
+      } else {
+        // For places, just zoom to the location
+        this.map.setView(targetLatLng, result.zoom || 13);
+      }
+    }
+  }
+
+  findNearestNeighborExcluding(targetLatLng, excludeUsername) {
+    const L = window.L;
+    let nearestLatLng = null;
+    let nearestDistance = Infinity;
+
+    this.locations.forEach((location) => {
+      if (location.user.username === excludeUsername) {
+        return;
+      }
+
+      location.coordinates?.forEach((coord) => {
+        const coordLatLng = L.latLng(coord.lat, coord.lng);
+        const distance = targetLatLng.distanceTo(coordLatLng);
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestLatLng = coordLatLng;
+        }
+      });
+    });
+
+    return nearestLatLng;
+  }
+
+  hideSearchResults() {
+    this.showSearchResults = false;
+    this.cleanupSearchClickOutside();
+  }
+
+  setupSearchClickOutside() {
+    if (this.searchClickOutsideHandler) return;
+
+    this.searchClickOutsideHandler = (e) => {
+      if (!e.target.closest(".member-map-search")) {
+        this.hideSearchResults();
+      }
+    };
+    setTimeout(() => {
+      document.addEventListener("click", this.searchClickOutsideHandler);
+    }, 0);
+  }
+
+  cleanupSearchClickOutside() {
+    if (this.searchClickOutsideHandler) {
+      document.removeEventListener("click", this.searchClickOutsideHandler);
+      this.searchClickOutsideHandler = null;
+    }
+  }
+
+  @action
   resetView() {
     if (this.map) {
       this.map.setView(this.defaultCenter, this.defaultZoom);
@@ -366,22 +568,28 @@ export default class MemberMap extends Component {
       return;
     }
 
-    // Find or create current user's location entry
-    let userLocIndex = this.locations.findIndex(
+    // Find current user's location entry
+    const userLocIndex = this.locations.findIndex(
       (loc) => loc.user.id === this.currentUser.id
     );
+
+    // Create a new array to trigger Glimmer reactivity
+    let updatedLocations = [...this.locations];
 
     if (newCoordinates.length === 0) {
       // Remove user from locations if no coordinates
       if (userLocIndex >= 0) {
-        this.locations.splice(userLocIndex, 1);
+        updatedLocations.splice(userLocIndex, 1);
       }
     } else if (userLocIndex >= 0) {
-      // Update existing entry
-      this.locations[userLocIndex].coordinates = newCoordinates;
+      // Update existing entry with new object reference
+      updatedLocations[userLocIndex] = {
+        ...updatedLocations[userLocIndex],
+        coordinates: newCoordinates,
+      };
     } else {
       // Add new entry
-      this.locations.push({
+      updatedLocations.push({
         user: {
           id: this.currentUser.id,
           username: this.currentUser.username,
@@ -392,6 +600,7 @@ export default class MemberMap extends Component {
       });
     }
 
+    this.locations = updatedLocations;
     this.hasHomeLocation = newCoordinates.length > 0;
   }
 
@@ -463,7 +672,12 @@ export default class MemberMap extends Component {
   initializeMap(element) {
     const L = window.L;
 
-    this.map = L.map(element).setView(this.defaultCenter, this.defaultZoom);
+    this.map = L.map(element, {
+      zoomControl: false, // We'll add it in a different position
+    }).setView(this.defaultCenter, this.defaultZoom);
+
+    // Add zoom control to bottom-right
+    L.control.zoom({ position: "bottomright" }).addTo(this.map);
 
     // Add OpenStreetMap tile layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -592,42 +806,92 @@ export default class MemberMap extends Component {
         </div>
       {{/if}}
 
-      <div class="member-map-controls">
-        <DButton
-          @action={{this.resetView}}
-          @icon="globe"
-          @title="vzekc_map.reset_view"
-          class="btn-default member-map-reset-btn"
-        />
-        <div class="member-map-home-container">
-          <DButton
-            @action={{this.goToHome}}
-            @icon="house"
-            @title={{if this.hasHomeLocation "vzekc_map.go_home" "vzekc_map.go_home_disabled"}}
-            @disabled={{not this.hasHomeLocation}}
-            class="btn-default member-map-home-btn"
-          />
-          {{#if this.showLocationPicker}}
-            <div class="member-map-location-picker">
-              {{#each this.currentUserLocations as |location index|}}
-                <button
-                  type="button"
-                  class="member-map-location-option"
-                  {{on "click" (fn this.selectLocation location)}}
-                >
-                  {{icon "map-marker-alt"}}
-                  <span class="location-name">{{this.getLocationDisplayName location}}</span>
-                </button>
-              {{/each}}
+      <div class="member-map-toolbar">
+        <div class="member-map-search">
+          <div class="member-map-search-input-wrapper">
+            {{icon "magnifying-glass" class="search-icon"}}
+            <input
+              type="text"
+              class="member-map-search-input"
+              placeholder={{i18n "vzekc_map.search_placeholder"}}
+              value={{this.searchQuery}}
+              autocomplete="off"
+              {{on "input" this.onSearchInput}}
+              {{on "focus" this.onSearchFocus}}
+              {{on "keydown" this.onSearchKeydown}}
+            />
+            {{#if this.isSearching}}
+              {{icon "spinner" class="spinner search-spinner"}}
+            {{/if}}
+          </div>
+          {{#if this.showSearchResults}}
+            <div class="member-map-search-results">
+              {{#if this.searchResults.length}}
+                {{#each this.searchResults as |result|}}
+                  <button
+                    type="button"
+                    class="member-map-search-result"
+                    {{on "click" (fn this.selectSearchResult result)}}
+                  >
+                    {{#if (eq result.type "member")}}
+                      {{icon "user"}}
+                    {{else}}
+                      {{icon "map-marker-alt"}}
+                    {{/if}}
+                    <div class="search-result-text">
+                      <span class="search-result-label">{{result.label}}</span>
+                      {{#if result.sublabel}}
+                        <span class="search-result-sublabel">{{result.sublabel}}</span>
+                      {{/if}}
+                    </div>
+                  </button>
+                {{/each}}
+              {{else if (not this.isSearching)}}
+                <div class="member-map-search-no-results">
+                  {{i18n "vzekc_map.search_no_results"}}
+                </div>
+              {{/if}}
             </div>
           {{/if}}
         </div>
-        <DButton
-          @action={{this.toggleAddLocation}}
-          @icon={{if this.isAddingLocation "xmark" "plus"}}
-          @title={{if this.isAddingLocation "vzekc_map.cancel_add" "vzekc_map.add_location"}}
-          class="btn-default member-map-add-btn {{if this.isAddingLocation 'is-adding'}}"
-        />
+
+        <div class="member-map-controls">
+          <DButton
+            @action={{this.resetView}}
+            @icon="globe"
+            @title="vzekc_map.reset_view"
+            class="btn-default member-map-control-btn"
+          />
+          <div class="member-map-home-container">
+            <DButton
+              @action={{this.goToHome}}
+              @icon="house"
+              @title={{if this.hasHomeLocation "vzekc_map.go_home" "vzekc_map.go_home_disabled"}}
+              @disabled={{not this.hasHomeLocation}}
+              class="btn-default member-map-control-btn"
+            />
+            {{#if this.showLocationPicker}}
+              <div class="member-map-location-picker">
+                {{#each this.currentUserLocations as |location index|}}
+                  <button
+                    type="button"
+                    class="member-map-location-option"
+                    {{on "click" (fn this.selectLocation location)}}
+                  >
+                    {{icon "map-marker-alt"}}
+                    <span class="location-name">{{this.getLocationDisplayName location}}</span>
+                  </button>
+                {{/each}}
+              </div>
+            {{/if}}
+          </div>
+          <DButton
+            @action={{this.toggleAddLocation}}
+            @icon={{if this.isAddingLocation "xmark" "plus"}}
+            @title={{if this.isAddingLocation "vzekc_map.cancel_add" "vzekc_map.add_location"}}
+            class="btn-default member-map-control-btn {{if this.isAddingLocation 'is-adding'}}"
+          />
+        </div>
       </div>
 
       <div

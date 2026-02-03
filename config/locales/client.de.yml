@@ -9,6 +9,8 @@ de:
       title: "Mitgliederkarte"
       loading: "Lade Karte..."
       no_locations: "Keine Standorte gefunden"
+      search_placeholder: "Mitglieder oder Orte suchen..."
+      search_no_results: "Keine Ergebnisse gefunden"
       reset_view: "Gesamtansicht"
       go_home: "Zu meinem Standort"
       go_home_disabled: "Kein Standort gesetzt"

@@ -9,6 +9,8 @@ en:
       title: "Member Map"
       loading: "Loading map..."
       no_locations: "No locations found"
+      search_placeholder: "Search members or places..."
+      search_no_results: "No results found"
       reset_view: "Show all"
       go_home: "Go to my location"
       go_home_disabled: "No location set"

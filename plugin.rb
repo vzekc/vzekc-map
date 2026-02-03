@@ -22,6 +22,8 @@ register_svg_icon "xmark"
 register_svg_icon "crosshairs"
 register_svg_icon "location-crosshairs"
 register_svg_icon "globe"
+register_svg_icon "magnifying-glass"
+register_svg_icon "user"
 
 module ::VzekcMap
   PLUGIN_NAME = "vzekc-map"
