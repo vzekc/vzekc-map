@@ -1,0 +1,22 @@
+vzekc_map:
+  vzekc_map_enabled:
+    default: false
+    client: true
+  vzekc_map_members_group_name:
+    default: "vereinsmitglieder"
+    type: string
+    client: false
+  vzekc_map_default_center_lat:
+    default: 51.1657
+    type: float
+    client: true
+  vzekc_map_default_center_lng:
+    default: 10.4515
+    type: float
+    client: true
+  vzekc_map_default_zoom:
+    default: 6
+    type: integer
+    min: 1
+    max: 18
+    client: true

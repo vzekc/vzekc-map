@@ -1,0 +1,10 @@
+en:
+  site_settings:
+    vzekc_map_enabled: "Enable Vzekc member map"
+    vzekc_map_members_group_name: "Name of the group whose members can view the map"
+    vzekc_map_default_center_lat: "Default latitude for map centering"
+    vzekc_map_default_center_lng: "Default longitude for map centering"
+    vzekc_map_default_zoom: "Default map zoom level"
+  vzekc_map:
+    errors:
+      members_only: "This page is only accessible to association members."

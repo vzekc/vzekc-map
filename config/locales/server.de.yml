@@ -1,0 +1,10 @@
+de:
+  site_settings:
+    vzekc_map_enabled: "Vzekc Mitgliederkarte aktivieren"
+    vzekc_map_members_group_name: "Name der Gruppe, deren Mitglieder die Karte sehen dürfen"
+    vzekc_map_default_center_lat: "Standard-Breitengrad für die Kartenzentrierung"
+    vzekc_map_default_center_lng: "Standard-Längengrad für die Kartenzentrierung"
+    vzekc_map_default_zoom: "Standard-Zoomstufe der Karte"
+  vzekc_map:
+    errors:
+      members_only: "Diese Seite ist nur für Vereinsmitglieder zugänglich."

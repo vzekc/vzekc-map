@@ -1,0 +1,14 @@
+en:
+  admin_js:
+    admin:
+      site_settings:
+        categories:
+          vzekc_map: "Vzekc Member Map"
+  js:
+    vzekc_map:
+      title: "Member Map"
+      loading: "Loading map..."
+      no_locations: "No locations found"
+      errors:
+        members_only: "This page is only accessible to association members."
+        load_failed: "Failed to load map data"

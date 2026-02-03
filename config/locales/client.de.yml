@@ -1,0 +1,14 @@
+de:
+  admin_js:
+    admin:
+      site_settings:
+        categories:
+          vzekc_map: "Vzekc Mitgliederkarte"
+  js:
+    vzekc_map:
+      title: "Mitgliederkarte"
+      loading: "Lade Karte..."
+      no_locations: "Keine Standorte gefunden"
+      errors:
+        members_only: "Diese Seite ist nur für Vereinsmitglieder zugänglich."
+        load_failed: "Fehler beim Laden der Kartendaten"
