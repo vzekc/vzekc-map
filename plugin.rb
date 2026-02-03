@@ -29,6 +29,7 @@ end
 
 require_relative "lib/vzekc_map/engine"
 require_relative "lib/vzekc_map/geo_parser"
+require_relative "lib/vzekc_map/geocoder"
 require_relative "lib/vzekc_map/member_checker"
 
 after_initialize do

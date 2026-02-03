@@ -12,9 +12,11 @@ de:
       reset_view: "Gesamtansicht"
       go_home: "Zu meinem Standort"
       go_home_disabled: "Kein Standort gesetzt"
+      select_location: "Standort auswählen"
       add_location: "Standort hinzufügen"
       cancel_add: "Abbrechen"
       click_to_add: "Klicke auf die Karte, um einen Standort hinzuzufügen"
+      saving_location: "Standort wird gespeichert..."
       delete_location: "Standort löschen"
       delete_location_confirm: "Diesen Standort wirklich löschen?"
       errors:

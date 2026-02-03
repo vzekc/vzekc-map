@@ -66,8 +66,15 @@ module VzekcMap
         return render json: { error: I18n.t("vzekc_map.errors.invalid_coordinates") }, status: 422
       end
 
-      # Build new geo string
-      new_geo = zoom ? "geo:#{lat},#{lng}?z=#{zoom}" : "geo:#{lat},#{lng}"
+      # Reverse geocode to get location name
+      location_name = nil
+      geocode_result = VzekcMap::Geocoder.reverse_geocode(lat, lng)
+      if geocode_result
+        location_name = VzekcMap::Geocoder.format_location_name(geocode_result[:city], geocode_result[:postcode])
+      end
+
+      # Build new geo string with name
+      new_geo = GeoParser.build_geo_uri(lat, lng, zoom: zoom, name: location_name)
 
       # Get current geoinformation
       current_value = current_user.custom_fields["Geoinformation"] || ""

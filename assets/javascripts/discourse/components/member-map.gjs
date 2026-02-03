@@ -1,6 +1,8 @@
 import Component from "@glimmer/component";
 import { tracked } from "@glimmer/tracking";
 import { action } from "@ember/object";
+import { fn } from "@ember/helper";
+import { on } from "@ember/modifier";
 import didInsert from "@ember/render-modifiers/modifiers/did-insert";
 import willDestroy from "@ember/render-modifiers/modifiers/will-destroy";
 import { service } from "@ember/service";
@@ -43,11 +45,14 @@ export default class MemberMap extends Component {
   @tracked hasHomeLocation = false;
   @tracked locations = [];
   @tracked isAddingLocation = false;
+  @tracked isSavingLocation = false;
+  @tracked showLocationPicker = false;
 
   map = null;
   markerCluster = null;
   mapClickHandler = null;
   escapeHandler = null;
+  locationPickerClickOutsideHandler = null;
 
   get defaultCenter() {
     return [
@@ -68,6 +73,16 @@ export default class MemberMap extends Component {
       (loc) => loc.user.id === this.currentUser.id
     );
     return userLoc?.coordinates?.[0] || null;
+  }
+
+  get currentUserLocations() {
+    if (!this.currentUser) {
+      return [];
+    }
+    const userLoc = this.locations.find(
+      (loc) => loc.user.id === this.currentUser.id
+    );
+    return userLoc?.coordinates || [];
   }
 
   @action
@@ -94,6 +109,11 @@ export default class MemberMap extends Component {
   destroyMap() {
     this.saveMapState();
     this.exitAddingMode();
+    this.cleanupLocationPickerClickOutside();
+    if (this.deleteClickHandler && this.map) {
+      this.map.getContainer().removeEventListener("click", this.deleteClickHandler, true);
+      this.deleteClickHandler = null;
+    }
     if (this.map) {
       this.map.remove();
       this.map = null;
@@ -134,10 +154,110 @@ export default class MemberMap extends Component {
 
   @action
   goToHome() {
-    const homeLoc = this.currentUserLocation;
-    if (homeLoc && this.map) {
-      this.map.setView([homeLoc.lat, homeLoc.lng], homeLoc.zoom || 15);
+    const userLocations = this.currentUserLocations;
+    if (!userLocations.length || !this.map) {
+      return;
     }
+
+    // If only one location, go directly with smart zoom
+    if (userLocations.length === 1) {
+      this.goToLocationWithSmartZoom(userLocations[0]);
+      return;
+    }
+
+    // Multiple locations - show picker
+    this.showLocationPicker = true;
+    this.setupLocationPickerClickOutside();
+  }
+
+  @action
+  selectLocation(location) {
+    this.hideLocationPicker();
+    this.goToLocationWithSmartZoom(location);
+  }
+
+  @action
+  hideLocationPicker() {
+    this.showLocationPicker = false;
+    this.cleanupLocationPickerClickOutside();
+  }
+
+  setupLocationPickerClickOutside() {
+    // Close picker when clicking outside
+    this.locationPickerClickOutsideHandler = (e) => {
+      if (!e.target.closest(".member-map-location-picker") &&
+          !e.target.closest(".member-map-home-btn")) {
+        this.hideLocationPicker();
+      }
+    };
+    // Use setTimeout to avoid immediate trigger from the button click
+    setTimeout(() => {
+      document.addEventListener("click", this.locationPickerClickOutsideHandler);
+    }, 0);
+  }
+
+  cleanupLocationPickerClickOutside() {
+    if (this.locationPickerClickOutsideHandler) {
+      document.removeEventListener("click", this.locationPickerClickOutsideHandler);
+      this.locationPickerClickOutsideHandler = null;
+    }
+  }
+
+  goToLocationWithSmartZoom(targetLocation) {
+    if (!this.map || !targetLocation) {
+      return;
+    }
+
+    const L = window.L;
+    const targetLatLng = L.latLng(targetLocation.lat, targetLocation.lng);
+
+    // Find nearest other member (excluding current user's locations)
+    const nearestNeighbor = this.findNearestNeighbor(targetLatLng);
+
+    if (nearestNeighbor) {
+      // Fit bounds to show both target and nearest neighbor
+      const bounds = L.latLngBounds([targetLatLng, nearestNeighbor]);
+      this.map.fitBounds(bounds, {
+        padding: [50, 50],
+        maxZoom: 15,
+      });
+    } else {
+      // No other members, just center on target with saved zoom or default
+      this.map.setView(targetLatLng, targetLocation.zoom || 12);
+    }
+  }
+
+  findNearestNeighbor(targetLatLng) {
+    const L = window.L;
+    let nearestLatLng = null;
+    let nearestDistance = Infinity;
+
+    this.locations.forEach((location) => {
+      // Skip current user's locations
+      if (location.user.id === this.currentUser?.id) {
+        return;
+      }
+
+      location.coordinates?.forEach((coord) => {
+        const coordLatLng = L.latLng(coord.lat, coord.lng);
+        const distance = targetLatLng.distanceTo(coordLatLng);
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestLatLng = coordLatLng;
+        }
+      });
+    });
+
+    return nearestLatLng;
+  }
+
+  getLocationDisplayName(location) {
+    if (location.name) {
+      return location.name;
+    }
+    // Fallback to coordinates if no name
+    return `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`;
   }
 
   @action
@@ -202,6 +322,9 @@ export default class MemberMap extends Component {
   async saveNewLocation(lat, lng) {
     const zoom = this.map.getZoom();
 
+    this.isSavingLocation = true;
+    this.exitAddingMode();
+
     try {
       const result = await ajax("/vzekc-map/locations.json", {
         type: "POST",
@@ -213,9 +336,9 @@ export default class MemberMap extends Component {
       this.rebuildMarkers();
     } catch (e) {
       popupAjaxError(e);
+    } finally {
+      this.isSavingLocation = false;
     }
-
-    this.exitAddingMode();
   }
 
   @action
@@ -364,6 +487,19 @@ export default class MemberMap extends Component {
     });
 
     this.map.addLayer(this.markerCluster);
+
+    // Use event delegation for delete buttons - captures clicks before marker events
+    this.deleteClickHandler = (e) => {
+      const deleteBtn = e.target.closest(".member-map-marker-delete");
+      if (deleteBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        const deleteIndex = parseInt(deleteBtn.getAttribute("data-index"), 10);
+        this.deleteLocation(deleteIndex);
+      }
+    };
+    element.addEventListener("click", this.deleteClickHandler, true); // Use capture phase
   }
 
   addMarkers() {
@@ -399,19 +535,15 @@ export default class MemberMap extends Component {
 
         const marker = L.marker([coord.lat, coord.lng], { icon: markerIcon });
 
-        // Handle click events
+        // Handle click events - delete button clicks are handled by event delegation
         marker.on("click", (e) => {
           // Don't navigate if in adding mode
           if (this.isAddingLocation) {
             return;
           }
 
-          // Check if delete button was clicked (or any element inside it)
-          const deleteBtn = e.originalEvent.target.closest(".member-map-marker-delete");
-          if (deleteBtn) {
-            e.originalEvent.stopPropagation();
-            const deleteIndex = parseInt(deleteBtn.getAttribute("data-index"), 10);
-            this.deleteLocation(deleteIndex);
+          // Don't navigate if click was on delete button (handled by delegation)
+          if (e.originalEvent.target.closest(".member-map-marker-delete")) {
             return;
           }
 
@@ -453,6 +585,13 @@ export default class MemberMap extends Component {
         </div>
       {{/if}}
 
+      {{#if this.isSavingLocation}}
+        <div class="member-map-saving-hint">
+          {{icon "spinner" class="spinner"}}
+          {{i18n "vzekc_map.saving_location"}}
+        </div>
+      {{/if}}
+
       <div class="member-map-controls">
         <DButton
           @action={{this.resetView}}
@@ -460,13 +599,29 @@ export default class MemberMap extends Component {
           @title="vzekc_map.reset_view"
           class="btn-default member-map-reset-btn"
         />
-        <DButton
-          @action={{this.goToHome}}
-          @icon="house"
-          @title={{if this.hasHomeLocation "vzekc_map.go_home" "vzekc_map.go_home_disabled"}}
-          @disabled={{not this.hasHomeLocation}}
-          class="btn-default member-map-home-btn"
-        />
+        <div class="member-map-home-container">
+          <DButton
+            @action={{this.goToHome}}
+            @icon="house"
+            @title={{if this.hasHomeLocation "vzekc_map.go_home" "vzekc_map.go_home_disabled"}}
+            @disabled={{not this.hasHomeLocation}}
+            class="btn-default member-map-home-btn"
+          />
+          {{#if this.showLocationPicker}}
+            <div class="member-map-location-picker">
+              {{#each this.currentUserLocations as |location index|}}
+                <button
+                  type="button"
+                  class="member-map-location-option"
+                  {{on "click" (fn this.selectLocation location)}}
+                >
+                  {{icon "map-marker-alt"}}
+                  <span class="location-name">{{this.getLocationDisplayName location}}</span>
+                </button>
+              {{/each}}
+            </div>
+          {{/if}}
+        </div>
         <DButton
           @action={{this.toggleAddLocation}}
           @icon={{if this.isAddingLocation "xmark" "plus"}}

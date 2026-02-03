@@ -4,6 +4,7 @@ module VzekcMap
   module GeoParser
     # Parse geoinformation string into array of coordinate hashes
     # Supports multiple formats:
+    # - geo:lat,lng?z=zoom&name=Name (with location name): geo:52.535150,13.394236?z=19&name=Berlin%20(10178)
     # - geo:lat,lng?z=zoom (most common): geo:52.535150,13.394236?z=19
     # - geo:lat,lng (no zoom): geo:50.800411,6.914046
     # - geo: lat,lng (space after colon): geo: 49.536401,8.350006
@@ -13,7 +14,7 @@ module VzekcMap
     # - Typos like eo: instead of geo:
     #
     # @param geo_string [String] The geoinformation string to parse
-    # @return [Array<Hash>] Array of { lat:, lng:, zoom: } hashes
+    # @return [Array<Hash>] Array of { lat:, lng:, zoom:, name: } hashes
     def self.parse(geo_string)
       return [] if geo_string.blank?
 
@@ -62,7 +63,7 @@ module VzekcMap
     # Format: https://www.openstreetmap.org/?#map=zoom/lat/lng
     #
     # @param url [String] OpenStreetMap URL
-    # @return [Hash, nil] { lat:, lng:, zoom: } or nil
+    # @return [Hash, nil] { lat:, lng:, zoom:, name: } or nil
     def self.parse_osm_url(url)
       # Extract map parameter: #map=zoom/lat/lng
       if url =~ /[#?&]map=(\d+)\/(-?\d+\.?\d*)\/(-?\d+\.?\d*)/
@@ -72,7 +73,7 @@ module VzekcMap
 
         return nil unless valid_coordinates?(lat, lng)
 
-        { lat: lat, lng: lng, zoom: zoom }
+        { lat: lat, lng: lng, zoom: zoom, name: nil }
       else
         nil
       end
@@ -80,21 +81,28 @@ module VzekcMap
 
     # Parse geo: URI format
     # Formats:
+    # - geo:lat,lng?z=zoom&name=Name
     # - geo:lat,lng?z=zoom
     # - geo:lat,lng
     # - geo: lat,lng (with space)
     # - eo:lat,lng (typo)
     #
     # @param uri [String] geo: URI string
-    # @return [Hash, nil] { lat:, lng:, zoom: } or nil
+    # @return [Hash, nil] { lat:, lng:, zoom:, name: } or nil
     def self.parse_geo_uri(uri)
       # Remove geo:/eo: prefix and optional space
       coords_part = uri.sub(/^[eg]?eo:\s*/i, "")
 
       # Extract zoom from ?z= parameter if present
       zoom = nil
-      if coords_part =~ /\?.*z=(\d+)/
+      if coords_part =~ /[?&]z=(\d+)/
         zoom = $1.to_i
+      end
+
+      # Extract name from ?name= parameter if present
+      name = nil
+      if coords_part =~ /[?&]name=([^&]+)/
+        name = URI.decode_www_form_component($1)
       end
 
       # Remove query string to get just coordinates
@@ -107,7 +115,7 @@ module VzekcMap
 
         return nil unless valid_coordinates?(lat, lng)
 
-        { lat: lat, lng: lng, zoom: zoom }
+        { lat: lat, lng: lng, zoom: zoom, name: name }
       else
         nil
       end
@@ -116,7 +124,7 @@ module VzekcMap
     # Parse raw lat,lng format
     #
     # @param str [String] Raw coordinates string "lat,lng"
-    # @return [Hash, nil] { lat:, lng:, zoom: } or nil
+    # @return [Hash, nil] { lat:, lng:, zoom:, name: } or nil
     def self.parse_raw_coords(str)
       if str =~ /^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/
         lat = $1.to_f
@@ -124,7 +132,7 @@ module VzekcMap
 
         return nil unless valid_coordinates?(lat, lng)
 
-        { lat: lat, lng: lng, zoom: nil }
+        { lat: lat, lng: lng, zoom: nil, name: nil }
       else
         nil
       end
@@ -137,6 +145,22 @@ module VzekcMap
     # @return [Boolean] true if valid
     def self.valid_coordinates?(lat, lng)
       lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+    end
+
+    # Build a geo: URI string from coordinates
+    #
+    # @param lat [Float] Latitude
+    # @param lng [Float] Longitude
+    # @param zoom [Integer, nil] Optional zoom level
+    # @param name [String, nil] Optional location name
+    # @return [String] geo: URI string
+    def self.build_geo_uri(lat, lng, zoom: nil, name: nil)
+      uri = "geo:#{lat},#{lng}"
+      params = []
+      params << "z=#{zoom}" if zoom
+      params << "name=#{URI.encode_www_form_component(name)}" if name.present?
+      uri += "?#{params.join('&')}" if params.any?
+      uri
     end
   end
 end

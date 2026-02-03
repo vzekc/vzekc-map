@@ -12,9 +12,11 @@ en:
       reset_view: "Show all"
       go_home: "Go to my location"
       go_home_disabled: "No location set"
+      select_location: "Select location"
       add_location: "Add location"
       cancel_add: "Cancel"
       click_to_add: "Click on the map to add a location"
+      saving_location: "Saving location..."
       delete_location: "Delete location"
       delete_location_confirm: "Really delete this location?"
       errors:
