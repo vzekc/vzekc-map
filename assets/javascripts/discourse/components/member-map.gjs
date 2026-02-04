@@ -62,7 +62,6 @@ export default class MemberMap extends Component {
   markerCluster = null;
   poiCluster = null;
   searchMarker = null;
-  searchMarkerCleanupHandler = null;
   mapClickHandler = null;
   escapeHandler = null;
   locationPickerClickOutsideHandler = null;
@@ -343,6 +342,9 @@ export default class MemberMap extends Component {
     const query = event.target.value;
     this.searchQuery = query;
 
+    // Remove search marker when user starts typing
+    this.removeSearchMarker();
+
     // Clear previous timer
     if (this.searchDebounceTimer) {
       clearTimeout(this.searchDebounceTimer);
@@ -475,7 +477,7 @@ export default class MemberMap extends Component {
   @action
   selectSearchResult(result) {
     this.hideSearchResults();
-    this.searchQuery = "";
+    this.searchQuery = result.label;
 
     if (this.map) {
       const L = window.L;
@@ -527,24 +529,12 @@ export default class MemberMap extends Component {
 
     this.searchMarker = L.marker(latLng, { icon: markerIcon });
     this.searchMarker.addTo(this.map);
-
-    // Remove marker when map is moved or zoomed
-    this.searchMarkerCleanupHandler = () => {
-      this.removeSearchMarker();
-    };
-    this.map.once("movestart", this.searchMarkerCleanupHandler);
-    this.map.once("zoomstart", this.searchMarkerCleanupHandler);
   }
 
   removeSearchMarker() {
     if (this.searchMarker) {
       this.map.removeLayer(this.searchMarker);
       this.searchMarker = null;
-    }
-    if (this.searchMarkerCleanupHandler) {
-      this.map.off("movestart", this.searchMarkerCleanupHandler);
-      this.map.off("zoomstart", this.searchMarkerCleanupHandler);
-      this.searchMarkerCleanupHandler = null;
     }
   }
 
