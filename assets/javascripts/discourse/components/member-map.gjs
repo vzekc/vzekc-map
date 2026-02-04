@@ -491,6 +491,12 @@ export default class MemberMap extends Component {
       let targetZoom = result.zoom || 15;
 
       if (result.type === "member") {
+        // Enable member layer if disabled
+        if (!this.layerMembers) {
+          this.layerMembers = true;
+          this.updateLayerVisibility();
+          this.saveMapState();
+        }
         // For members, use smart zoom but ensure minimum zoom
         const nearestNeighbor = this.findNearestNeighborExcluding(targetLatLng, result.label.slice(1));
         if (nearestNeighbor) {
@@ -504,15 +510,19 @@ export default class MemberMap extends Component {
           this.map.setView(targetLatLng, Math.max(targetZoom, minZoomForAdding));
         }
       } else if (result.type === "poi") {
+        // Enable POI layer if disabled
+        if (!this.layerPois) {
+          this.layerPois = true;
+          this.updateLayerVisibility();
+          this.saveMapState();
+        }
         // For POIs, zoom in appropriately
         this.map.setView(targetLatLng, Math.max(targetZoom, minZoomForAdding));
       } else {
-        // For places, zoom to the location with minimum zoom
+        // For places, zoom to the location and add search marker
         this.map.setView(targetLatLng, Math.max(targetZoom, minZoomForAdding));
+        this.addSearchMarker(targetLatLng);
       }
-
-      // Add search marker to indicate the location
-      this.addSearchMarker(targetLatLng);
     }
   }
 
