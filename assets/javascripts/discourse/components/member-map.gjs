@@ -350,7 +350,9 @@ export default class MemberMap extends Component {
       clearTimeout(this.searchDebounceTimer);
     }
 
-    if (query.length < 2) {
+    // Require at least 2 chars, or 3 if starting with @ (since @ is stripped)
+    const minLength = query.startsWith("@") ? 3 : 2;
+    if (query.length < minLength) {
       this.searchResults = [];
       this.showSearchResults = false;
       return;
@@ -384,11 +386,15 @@ export default class MemberMap extends Component {
     this.setupSearchClickOutside();
 
     const results = [];
-    const queryLower = query.toLowerCase();
+
+    // Check if query starts with @ for member-only search
+    const membersOnly = query.startsWith("@");
+    const searchTerm = membersOnly ? query.slice(1) : query;
+    const searchTermLower = searchTerm.toLowerCase();
 
     // Search members by username - include all locations for each matching user
     this.locations.forEach((location) => {
-      if (location.user.username.toLowerCase().includes(queryLower)) {
+      if (location.user.username.toLowerCase().includes(searchTermLower)) {
         location.coordinates?.forEach((coord) => {
           results.push({
             type: "member",
@@ -402,30 +408,33 @@ export default class MemberMap extends Component {
       }
     });
 
-    // Search POIs by title
-    if (this.poiEnabled) {
-      this.pois.forEach((poi) => {
-        if (poi.title.toLowerCase().includes(queryLower)) {
-          results.push({
-            type: "poi",
-            label: poi.title,
-            sublabel: poi.coordinates.name || `${poi.coordinates.lat.toFixed(4)}, ${poi.coordinates.lng.toFixed(4)}`,
-            lat: poi.coordinates.lat,
-            lng: poi.coordinates.lng,
-            zoom: poi.coordinates.zoom || 15,
-            topicUrl: `/t/${poi.slug}/${poi.topic_id}`,
-          });
-        }
-      });
-    }
+    // Only search POIs and places if not in member-only mode
+    if (!membersOnly) {
+      // Search POIs by title
+      if (this.poiEnabled) {
+        this.pois.forEach((poi) => {
+          if (poi.title.toLowerCase().includes(searchTermLower)) {
+            results.push({
+              type: "poi",
+              label: poi.title,
+              sublabel: poi.coordinates.name || `${poi.coordinates.lat.toFixed(4)}, ${poi.coordinates.lng.toFixed(4)}`,
+              lat: poi.coordinates.lat,
+              lng: poi.coordinates.lng,
+              zoom: poi.coordinates.zoom || 15,
+              topicUrl: `/t/${poi.slug}/${poi.topic_id}`,
+            });
+          }
+        });
+      }
 
-    // Search places via Nominatim
-    try {
-      const placeResults = await this.searchPlaces(query);
-      results.push(...placeResults);
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error("Place search failed:", e);
+      // Search places via Nominatim
+      try {
+        const placeResults = await this.searchPlaces(query);
+        results.push(...placeResults);
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("Place search failed:", e);
+      }
     }
 
     this.searchResults = results;
