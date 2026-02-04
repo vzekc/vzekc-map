@@ -119,6 +119,16 @@
   .member-map-search {
     position: relative;
     width: 320px;
+    transition: width 0.2s ease;
+
+    // On small screens, use narrower width but expand on focus
+    @media (max-width: 600px) {
+      width: 120px;
+
+      &:focus-within {
+        width: 320px;
+      }
+    }
 
     .member-map-search-input-wrapper {
       position: relative;
