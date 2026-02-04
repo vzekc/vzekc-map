@@ -69,6 +69,10 @@ export default class MemberMap extends Component {
   searchClickOutsideHandler = null;
   layerMenuClickOutsideHandler = null;
   addMenuClickOutsideHandler = null;
+  urlUpdateTimer = null;
+  popstateHandler = null;
+  isRestoringFromUrl = false;
+  initialUrlSet = false;
 
   get defaultCenter() {
     return [
@@ -168,6 +172,14 @@ export default class MemberMap extends Component {
       clearTimeout(this.searchDebounceTimer);
       this.searchDebounceTimer = null;
     }
+    if (this.urlUpdateTimer) {
+      clearTimeout(this.urlUpdateTimer);
+      this.urlUpdateTimer = null;
+    }
+    if (this.popstateHandler) {
+      window.removeEventListener("popstate", this.popstateHandler);
+      this.popstateHandler = null;
+    }
     if (this.deleteClickHandler && this.map) {
       this.map.getContainer().removeEventListener("click", this.deleteClickHandler, true);
       this.deleteClickHandler = null;
@@ -212,21 +224,94 @@ export default class MemberMap extends Component {
   }
 
   restoreMapState() {
+    // First try to restore from URL hash
+    const hashState = this.parseUrlHash();
+    if (hashState) {
+      this.isRestoringFromUrl = true;
+      this.map.setView([hashState.lat, hashState.lng], hashState.zoom);
+      this.isRestoringFromUrl = false;
+      this.initialUrlSet = true;
+      return;
+    }
+
+    // Fall back to session storage
     const savedState = sessionStorage.getItem(MAP_STATE_KEY);
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
+        this.isRestoringFromUrl = true;
         this.map.setView([state.lat, state.lng], state.zoom);
+        this.isRestoringFromUrl = false;
+        // Update URL to reflect the restored state
+        this.updateUrlHash(state.lat, state.lng, state.zoom, true);
+        this.initialUrlSet = true;
       } catch (e) {
         // Ignore invalid state
       }
     }
   }
 
+  parseUrlHash() {
+    const hash = window.location.hash;
+    // Format: #map=zoom/lat/lng
+    const match = hash.match(/^#map=(\d+)\/(-?\d+\.?\d*)\/(-?\d+\.?\d*)$/);
+    if (match) {
+      return {
+        zoom: parseInt(match[1], 10),
+        lat: parseFloat(match[2]),
+        lng: parseFloat(match[3]),
+      };
+    }
+    return null;
+  }
+
+  updateUrlHash(lat, lng, zoom, replace = false) {
+    const hash = `#map=${zoom}/${lat.toFixed(5)}/${lng.toFixed(5)}`;
+    if (replace) {
+      window.history.replaceState(null, "", hash);
+    } else {
+      window.history.pushState(null, "", hash);
+    }
+  }
+
   setupMapStateTracking() {
     // Save state when map moves or zooms
-    this.map.on("moveend", () => this.saveMapState());
-    this.map.on("zoomend", () => this.saveMapState());
+    this.map.on("moveend", () => this.onMapMoved());
+    this.map.on("zoomend", () => this.onMapMoved());
+
+    // Handle browser back/forward navigation
+    this.popstateHandler = () => {
+      const hashState = this.parseUrlHash();
+      if (hashState && this.map) {
+        this.isRestoringFromUrl = true;
+        this.map.setView([hashState.lat, hashState.lng], hashState.zoom);
+        this.isRestoringFromUrl = false;
+      }
+    };
+    window.addEventListener("popstate", this.popstateHandler);
+  }
+
+  onMapMoved() {
+    this.saveMapState();
+
+    // Don't update URL if we're restoring from URL (back/forward navigation)
+    if (this.isRestoringFromUrl) {
+      return;
+    }
+
+    // Debounce URL updates to avoid too many history entries
+    if (this.urlUpdateTimer) {
+      clearTimeout(this.urlUpdateTimer);
+    }
+    this.urlUpdateTimer = setTimeout(() => {
+      const center = this.map.getCenter();
+      const zoom = this.map.getZoom();
+      // Use replaceState for initial URL to avoid extra history entry
+      const useReplace = !this.initialUrlSet;
+      this.updateUrlHash(center.lat, center.lng, zoom, useReplace);
+      this.initialUrlSet = true;
+      this.urlUpdateTimer = null;
+    }, 500);
   }
 
   @action
