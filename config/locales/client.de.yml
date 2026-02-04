@@ -28,6 +28,7 @@ de:
       layers: "Ebenen"
       layer_members: "Mitglieder"
       layer_pois: "Sehenswürdigkeiten"
+      poi_view_details: "Details anzeigen"
       add_home_location: "Heimatstandort hinzufügen"
       add_poi: "POI hinzufügen"
       poi_template:

@@ -707,9 +707,17 @@ export default class MemberMap extends Component {
         <div class="poi-popup">
           <strong>${this.escapeHtml(poi.title)}</strong>
           <p>by @${this.escapeHtml(poi.user.username)}</p>
-          <a href="${topicUrl}">Open discussion</a>
+          <a href="${topicUrl}">${i18n("vzekc_map.poi_view_details")}</a>
         </div>
       `);
+
+      // Hide marker when popup opens, show when it closes
+      marker.on("popupopen", () => {
+        marker.setOpacity(0);
+      });
+      marker.on("popupclose", () => {
+        marker.setOpacity(1);
+      });
 
       this.poiCluster.addLayer(marker);
     });

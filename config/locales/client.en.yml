@@ -28,6 +28,7 @@ en:
       layers: "Layers"
       layer_members: "Members"
       layer_pois: "Points of Interest"
+      poi_view_details: "View details"
       add_home_location: "Add home location"
       add_poi: "Add POI"
       poi_template:
