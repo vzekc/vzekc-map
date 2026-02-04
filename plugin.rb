@@ -26,6 +26,8 @@ register_svg_icon "magnifying-glass"
 register_svg_icon "user"
 register_svg_icon "layer-group"
 register_svg_icon "map-pin"
+register_svg_icon "external-link-alt"
+register_svg_icon "chevron-down"
 
 module ::VzekcMap
   PLUGIN_NAME = "vzekc-map"
@@ -49,6 +51,14 @@ after_initialize do
   # Serialize to topic JSON
   add_to_serializer(:topic_view, :vzekc_map_coordinates) do
     object.topic.custom_fields["vzekc_map_coordinates"]
+  end
+
+  # Expose geo locations in user serializer for profile page
+  add_to_serializer(:user, :vzekc_map_locations) do
+    return nil unless SiteSetting.vzekc_map_enabled
+    geo_string = object.custom_fields["Geoinformation"]
+    return nil if geo_string.blank?
+    VzekcMap::GeoParser.parse(geo_string)
   end
 
   # After first post is created, extract coordinates from post body and save as topic custom field

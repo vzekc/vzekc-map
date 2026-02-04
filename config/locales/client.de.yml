@@ -48,6 +48,10 @@ de:
         add: 'Klicke auf den + Button und wähle "Standort hinzufügen", um deinen Standort auf der Karte zu markieren.'
         delete: "Um einen Standort zu entfernen, klicke auf deinen Marker und dann auf das X."
         home: "Klicke auf den Home-Button, um zu deinem Standort zu springen, oder nutze das Dropdown, um einen deiner Standorte auszuwählen."
+      profile_links:
+        google_maps: "Google Maps"
+        apple_maps: "Apple Maps"
+        openstreetmap: "OpenStreetMap"
       errors:
         members_only: "Diese Seite ist nur für Vereinsmitglieder zugänglich."
         load_failed: "Fehler beim Laden der Kartendaten"

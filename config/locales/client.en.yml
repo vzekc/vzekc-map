@@ -48,6 +48,10 @@ en:
         add: "Click the + button and select \"Add location\" to mark your location on the map."
         delete: "To remove a location, click your marker and then click the × button."
         home: "Click the home button to jump to your location, or use the dropdown to select one of your locations."
+      profile_links:
+        google_maps: "Google Maps"
+        apple_maps: "Apple Maps"
+        openstreetmap: "OpenStreetMap"
       errors:
         members_only: "This page is only accessible to association members."
         load_failed: "Failed to load map data"
