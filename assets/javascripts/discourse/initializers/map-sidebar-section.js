@@ -35,6 +35,11 @@ export default {
               return "memberMap";
             }
 
+            get href() {
+              // Explicit href without hash to always show default view
+              return "/member-map";
+            }
+
             get text() {
               return i18n("vzekc_map.nav.member_map");
             }
