@@ -6,6 +6,9 @@ en:
           vzekc_map: "Vzekc Member Map"
   js:
     vzekc_map:
+      nav:
+        section_title: "Map"
+        member_map: "Member Map"
       title: "Member Map"
       loading: "Loading map..."
       no_locations: "No locations found"
@@ -37,6 +40,13 @@ en:
         contact_heading: "## Contact"
         contact_hint: "<!-- Optional: Website, phone, email, address -->"
         warning: "<!-- Do not remove the map link above - it stores the POI location -->"
+      help:
+        title: "How to use the map"
+        view: "Click on a marker to see who lives there. Click the name to visit their profile."
+        search: "Use the search box to find members, points of interest, or places by name."
+        add: "Click the + button and select \"Add location\" to mark your location on the map."
+        delete: "To remove a location, click your marker and then click the × button."
+        home: "Click the home button to jump to your location, or use the dropdown to select one of your locations."
       errors:
         members_only: "This page is only accessible to association members."
         load_failed: "Failed to load map data"

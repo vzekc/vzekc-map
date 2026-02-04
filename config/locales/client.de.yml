@@ -6,6 +6,9 @@ de:
           vzekc_map: "Vzekc Mitgliederkarte"
   js:
     vzekc_map:
+      nav:
+        section_title: "Karte"
+        member_map: "Mitgliederkarte"
       title: "Mitgliederkarte"
       loading: "Lade Karte..."
       no_locations: "Keine Standorte gefunden"
@@ -37,6 +40,13 @@ de:
         contact_heading: "## Kontakt"
         contact_hint: "<!-- Optional: Webseite, Telefon, E-Mail, Adresse -->"
         warning: "<!-- Bitte den Karten-Link oben nicht entfernen - er speichert den POI-Standort -->"
+      help:
+        title: "So funktioniert die Karte"
+        view: "Klicke auf einen Marker, um zu sehen, wer dort wohnt. Klicke auf den Namen, um das Profil zu besuchen."
+        search: "Nutze das Suchfeld, um Mitglieder, Sehenswürdigkeiten oder Orte zu finden."
+        add: 'Klicke auf den + Button und wähle "Standort hinzufügen", um deinen Standort auf der Karte zu markieren.'
+        delete: "Um einen Standort zu entfernen, klicke auf deinen Marker und dann auf das X."
+        home: "Klicke auf den Home-Button, um zu deinem Standort zu springen, oder nutze das Dropdown, um einen deiner Standorte auszuwählen."
       errors:
         members_only: "Diese Seite ist nur für Vereinsmitglieder zugänglich."
         load_failed: "Fehler beim Laden der Kartendaten"

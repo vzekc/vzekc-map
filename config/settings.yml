@@ -5,7 +5,7 @@ vzekc_map:
   vzekc_map_members_group_name:
     default: "vereinsmitglieder"
     type: string
-    client: false
+    client: true
   vzekc_map_default_center_lat:
     default: 51.1657
     type: float
