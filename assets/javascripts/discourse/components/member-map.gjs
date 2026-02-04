@@ -4,6 +4,7 @@ import { action } from "@ember/object";
 import { fn } from "@ember/helper";
 import { on } from "@ember/modifier";
 import didInsert from "@ember/render-modifiers/modifiers/did-insert";
+import didUpdate from "@ember/render-modifiers/modifiers/did-update";
 import willDestroy from "@ember/render-modifiers/modifiers/will-destroy";
 import { service } from "@ember/service";
 import DButton from "discourse/components/d-button";
@@ -120,13 +121,10 @@ export default class MemberMap extends Component {
 
       await this.loadLeaflet();
       this.initializeMap(element);
-      this.restoreMapState();
+      this.restoreMapPosition();
       this.addMarkers();
       await this.loadPois();
       this.setupMapStateTracking();
-
-      // Check for POI parameter in URL and center map if present
-      this.handlePoiUrlParameter();
 
       this.loading = false;
     } catch (e) {
@@ -137,9 +135,27 @@ export default class MemberMap extends Component {
     }
   }
 
-  handlePoiUrlParameter() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const poiParam = urlParams.get("poi");
+  restoreMapPosition() {
+    // Priority 1: POI parameter passed from controller
+    if (this.applyPoiParam()) {
+      return;
+    }
+
+    // Priority 2: URL hash
+    const hashState = this.parseUrlHash();
+    if (hashState) {
+      this.isRestoringFromUrl = true;
+      this.map.setView([hashState.lat, hashState.lng], hashState.zoom);
+      this.isRestoringFromUrl = false;
+      this.initialUrlSet = true;
+      return;
+    }
+
+    // Priority 3: Default view (no URL update until user moves map)
+  }
+
+  applyPoiParam() {
+    const poiParam = this.args.poi;
 
     if (poiParam) {
       const parts = poiParam.split(",");
@@ -149,20 +165,30 @@ export default class MemberMap extends Component {
         const zoom = parts.length >= 3 ? parseInt(parts[2], 10) : 15;
 
         if (!isNaN(lat) && !isNaN(lng)) {
+          this.isRestoringFromUrl = true;
           this.map.setView([lat, lng], zoom);
+          this.isRestoringFromUrl = false;
 
-          // Clear the URL parameter without reloading
-          const url = new URL(window.location);
-          url.searchParams.delete("poi");
-          window.history.replaceState({}, "", url);
+          // Update URL hash to reflect POI position
+          this.updateUrlHash(lat, lng, zoom, true);
+          this.initialUrlSet = true;
+          return true;
         }
       }
+    }
+    return false;
+  }
+
+  @action
+  onPoiParamChanged() {
+    if (this.map && this.args.poi) {
+      this.applyPoiParam();
     }
   }
 
   @action
   destroyMap() {
-    this.saveMapState();
+    this.saveLayerState();
     this.exitAddingMode();
     this.cleanupLocationPickerClickOutside();
     this.cleanupSearchClickOutside();
@@ -190,16 +216,8 @@ export default class MemberMap extends Component {
     }
   }
 
-  saveMapState() {
-    if (!this.map) {
-      return;
-    }
-    const center = this.map.getCenter();
-    const zoom = this.map.getZoom();
+  saveLayerState() {
     const state = {
-      lat: center.lat,
-      lng: center.lng,
-      zoom: zoom,
       layerMembers: this.layerMembers,
       layerPois: this.layerPois,
     };
@@ -217,34 +235,6 @@ export default class MemberMap extends Component {
         if (typeof state.layerPois === "boolean") {
           this.layerPois = state.layerPois;
         }
-      } catch (e) {
-        // Ignore invalid state
-      }
-    }
-  }
-
-  restoreMapState() {
-    // First try to restore from URL hash
-    const hashState = this.parseUrlHash();
-    if (hashState) {
-      this.isRestoringFromUrl = true;
-      this.map.setView([hashState.lat, hashState.lng], hashState.zoom);
-      this.isRestoringFromUrl = false;
-      this.initialUrlSet = true;
-      return;
-    }
-
-    // Fall back to session storage
-    const savedState = sessionStorage.getItem(MAP_STATE_KEY);
-    if (savedState) {
-      try {
-        const state = JSON.parse(savedState);
-        this.isRestoringFromUrl = true;
-        this.map.setView([state.lat, state.lng], state.zoom);
-        this.isRestoringFromUrl = false;
-        // Update URL to reflect the restored state
-        this.updateUrlHash(state.lat, state.lng, state.zoom, true);
-        this.initialUrlSet = true;
       } catch (e) {
         // Ignore invalid state
       }
@@ -292,8 +282,6 @@ export default class MemberMap extends Component {
   }
 
   onMapMoved() {
-    this.saveMapState();
-
     // Don't update URL if we're restoring from URL (back/forward navigation)
     if (this.isRestoringFromUrl) {
       return;
@@ -589,7 +577,7 @@ export default class MemberMap extends Component {
         if (!this.layerMembers) {
           this.layerMembers = true;
           this.updateLayerVisibility();
-          this.saveMapState();
+          this.saveLayerState();
         }
         // For members, use smart zoom but ensure minimum zoom
         const nearestNeighbor = this.findNearestNeighborExcluding(targetLatLng, result.label.slice(1));
@@ -608,7 +596,7 @@ export default class MemberMap extends Component {
         if (!this.layerPois) {
           this.layerPois = true;
           this.updateLayerVisibility();
-          this.saveMapState();
+          this.saveLayerState();
         }
         // For POIs, zoom in appropriately
         this.map.setView(targetLatLng, Math.max(targetZoom, minZoomForAdding));
@@ -730,14 +718,14 @@ export default class MemberMap extends Component {
   toggleMemberLayer(event) {
     this.layerMembers = event.target.checked;
     this.updateLayerVisibility();
-    this.saveMapState();
+    this.saveLayerState();
   }
 
   @action
   togglePoiLayer(event) {
     this.layerPois = event.target.checked;
     this.updateLayerVisibility();
-    this.saveMapState();
+    this.saveLayerState();
   }
 
   updateLayerVisibility() {

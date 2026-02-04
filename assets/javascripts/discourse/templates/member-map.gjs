@@ -6,7 +6,7 @@ import MemberMap from "../components/member-map";
     <div class="member-map-header">
       <h1>{{i18n "vzekc_map.title"}}</h1>
     </div>
-    <MemberMap @locations={{@model.locations}} />
+    <MemberMap @locations={{@model.locations}} @poi={{@controller.poi}} />
     <div class="member-map-help">
       <h3>{{i18n "vzekc_map.help.title"}}</h3>
       <ul>
