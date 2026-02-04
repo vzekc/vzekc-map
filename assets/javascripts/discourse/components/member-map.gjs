@@ -702,21 +702,11 @@ export default class MemberMap extends Component {
       const marker = L.marker([poi.coordinates.lat, poi.coordinates.lng], { icon: markerIcon });
       const topicUrl = getURL(`/t/${poi.slug}/${poi.topic_id}`);
 
-      // Show popup on click with POI info
-      marker.bindPopup(`
-        <div class="poi-popup">
-          <strong>${this.escapeHtml(poi.title)}</strong>
-          <p>by @${this.escapeHtml(poi.user.username)}</p>
-          <a href="${topicUrl}">${i18n("vzekc_map.poi_view_details")}</a>
-        </div>
-      `);
-
-      // Hide marker when popup opens, show when it closes
-      marker.on("popupopen", () => {
-        marker.setOpacity(0);
-      });
-      marker.on("popupclose", () => {
-        marker.setOpacity(1);
+      // Navigate to POI topic on click
+      marker.on("click", () => {
+        if (!this.isAddingLocation) {
+          window.location.href = topicUrl;
+        }
       });
 
       this.poiCluster.addLayer(marker);

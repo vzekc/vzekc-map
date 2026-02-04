@@ -637,31 +637,6 @@
   }
 }
 
-// POI popup
-.poi-popup {
-  min-width: 150px;
-
-  strong {
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  p {
-    margin: 0 0 8px;
-    color: var(--primary-medium);
-    font-size: 13px;
-  }
-
-  a {
-    font-weight: 500;
-    color: var(--tertiary);
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
-
 .leaflet-container {
   background: var(--secondary);
 }
