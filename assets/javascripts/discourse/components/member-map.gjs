@@ -58,6 +58,7 @@ export default class MemberMap extends Component {
   @tracked pois = [];
   @tracked showAddMenu = false;
   @tracked addingPoi = false;
+  @tracked showHelpOverlay = false;
 
   map = null;
   markerCluster = null;
@@ -866,6 +867,21 @@ export default class MemberMap extends Component {
     }
   }
 
+  @action
+  toggleHelpOverlay() {
+    this.showHelpOverlay = !this.showHelpOverlay;
+  }
+
+  @action
+  closeHelpOverlay() {
+    this.showHelpOverlay = false;
+  }
+
+  @action
+  stopPropagation(event) {
+    event.stopPropagation();
+  }
+
   enterAddingMode() {
     if (!this.map) {
       return;
@@ -1350,6 +1366,12 @@ ${t("warning")}
         </div>
 
         <div class="member-map-controls">
+          <DButton
+            @action={{this.toggleHelpOverlay}}
+            @icon="circle-question"
+            @title="vzekc_map.help.show"
+            class="btn-default member-map-control-btn"
+          />
           {{#if this.poiEnabled}}
             <div class="member-map-layer-container">
               <DButton
@@ -1445,6 +1467,24 @@ ${t("warning")}
         {{didInsert this.setupMap}}
         {{willDestroy this.destroyMap}}
       ></div>
+
+      {{#if this.showHelpOverlay}}
+        <div class="member-map-help-overlay" {{on "click" this.closeHelpOverlay}}>
+          <div class="member-map-help-modal" {{on "click" this.stopPropagation}}>
+            <button type="button" class="member-map-help-close" {{on "click" this.closeHelpOverlay}}>
+              {{icon "xmark"}}
+            </button>
+            <h3>{{i18n "vzekc_map.help.title"}}</h3>
+            <ul>
+              <li>{{i18n "vzekc_map.help.view"}}</li>
+              <li>{{i18n "vzekc_map.help.search"}}</li>
+              <li>{{i18n "vzekc_map.help.add"}}</li>
+              <li>{{i18n "vzekc_map.help.delete"}}</li>
+              <li>{{i18n "vzekc_map.help.home"}}</li>
+            </ul>
+          </div>
+        </div>
+      {{/if}}
     </div>
   </template>
 }

@@ -28,9 +28,27 @@ register_svg_icon "layer-group"
 register_svg_icon "map-pin"
 register_svg_icon "external-link-alt"
 register_svg_icon "chevron-down"
+register_svg_icon "circle-question"
 
 module ::VzekcMap
   PLUGIN_NAME = "vzekc-map"
+
+  def self.notify_map_update
+    PluginStore.set("vzekc-map", "last_activity", Time.now.iso8601)
+
+    # Get all member user IDs
+    members_group_name = SiteSetting.vzekc_map_members_group_name
+    return unless members_group_name.present?
+
+    group = Group.find_by(name: members_group_name)
+    return unless group
+
+    member_ids = group.users.pluck(:id)
+    return if member_ids.empty?
+
+    # Publish to MessageBus for all members
+    MessageBus.publish("/vzekc-map/new-content", { has_new: true }, user_ids: member_ids)
+  end
 end
 
 require_relative "lib/vzekc_map/engine"
@@ -47,6 +65,33 @@ after_initialize do
 
   # Register topic custom field for POI coordinates
   register_topic_custom_field_type("vzekc_map_coordinates", :string)
+
+  # Register user custom field for last map visit timestamp
+  register_user_custom_field_type("vzekc_map_last_visit", :string)
+
+  # Update global timestamp when user location changes
+  on(:user_custom_field_changed) do |user, field_name|
+    if field_name == "Geoinformation"
+      VzekcMap.notify_map_update
+    end
+  end
+
+  # Update global timestamp when POI topic is created
+  on(:topic_created) do |topic, opts, user|
+    poi_category_id = SiteSetting.vzekc_map_poi_category_id
+    if poi_category_id.present? && topic.category_id == poi_category_id.to_i
+      VzekcMap.notify_map_update
+    end
+  end
+
+  # Update global timestamp when POI topic is edited
+  on(:post_edited) do |post, topic_changed|
+    topic = post.topic
+    poi_category_id = SiteSetting.vzekc_map_poi_category_id
+    if poi_category_id.present? && topic&.category_id == poi_category_id.to_i
+      VzekcMap.notify_map_update
+    end
+  end
 
   # Serialize to topic JSON
   add_to_serializer(:topic_view, :vzekc_map_coordinates) do

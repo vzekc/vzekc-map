@@ -9,6 +9,7 @@ de:
       nav:
         section_title: "Karte"
         member_map: "Mitgliederkarte"
+        new: "neu"
       title: "Mitgliederkarte"
       loading: "Lade Karte..."
       no_locations: "Keine Standorte gefunden"
@@ -42,11 +43,27 @@ de:
         warning: "<!-- Bitte den Karten-Link oben nicht entfernen - er speichert den Standort der Sehenswürdigkeit -->"
       help:
         title: "So funktioniert die Karte"
+        show: "Hilfe"
         view: "Klicke auf den Namen, um das Profil des Mitglieds zu besuchen."
         search: "Nutze das Suchfeld, um Mitglieder, Sehenswürdigkeiten oder Orte zu finden."
         add: 'Klicke auf den + Button und wähle "Heimatstandort hinzufügen", um deinen Standort auf der Karte zu markieren.'
         delete: "Um einen Deiner Heimatstandorte zu entfernen, klicke auf das X auf Deinem Marker."
         home: "Klicke auf den Home-Button, um zu deinem Heimatstandort zu springen."
+      activity:
+        title: "Letzte Aktivitäten"
+        filter_all: "Alle"
+        filter_locations: "Standorte"
+        filter_pois: "POIs"
+        home_location: "Heimatstandort"
+        location_added_prefix: "hat einen"
+        location_added_suffix: "hinzugefügt"
+        location_updated_prefix: "hat"
+        location_updated_suffix: "aktualisiert"
+        poi_added_prefix: "hat"
+        poi_added_suffix: "hinzugefügt"
+        poi_updated_prefix: "hat"
+        poi_updated_suffix: "aktualisiert"
+        no_recent_changes: "Keine aktuellen Änderungen"
       profile_links:
         google_maps: "Google Maps"
         apple_maps: "Apple Maps"

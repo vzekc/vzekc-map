@@ -5,6 +5,7 @@ VzekcMap::Engine.routes.draw do
   post "/locations" => "map#add_location"
   delete "/locations/:index" => "map#delete_location"
   get "/pois" => "map#pois"
+  get "/has-new-content" => "map#has_new_content"
 end
 
 Discourse::Application.routes.draw do

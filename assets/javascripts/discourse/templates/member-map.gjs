@@ -1,5 +1,6 @@
 import { i18n } from "discourse-i18n";
 import MemberMap from "../components/member-map";
+import MapActivityLog from "../components/map-activity-log";
 
 <template>
   <div class="member-map-page">
@@ -7,15 +8,10 @@ import MemberMap from "../components/member-map";
       <h1>{{i18n "vzekc_map.title"}}</h1>
     </div>
     <MemberMap @locations={{@model.locations}} @poi={{@controller.poi}} />
-    <div class="member-map-help">
-      <h3>{{i18n "vzekc_map.help.title"}}</h3>
-      <ul>
-        <li>{{i18n "vzekc_map.help.view"}}</li>
-        <li>{{i18n "vzekc_map.help.search"}}</li>
-        <li>{{i18n "vzekc_map.help.add"}}</li>
-        <li>{{i18n "vzekc_map.help.delete"}}</li>
-        <li>{{i18n "vzekc_map.help.home"}}</li>
-      </ul>
-    </div>
+    <MapActivityLog
+      @userChanges={{@model.user_changes}}
+      @poiChanges={{@model.poi_changes}}
+      @lastVisit={{@model.last_visit}}
+    />
   </div>
 </template>

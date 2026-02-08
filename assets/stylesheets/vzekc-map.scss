@@ -8,6 +8,22 @@
   }
 }
 
+// New content indicator for map sidebar link
+.sidebar-section-wrapper[data-section-name="vzekc-map"] {
+  .sidebar-section-link[data-link-name="member-map"].has-new-content {
+    .sidebar-section-link-content-text::after {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-left: 6px;
+      background-color: var(--tertiary);
+      border-radius: 50%;
+      vertical-align: middle;
+    }
+  }
+}
+
 .member-map-page {
   .member-map-header {
     margin-bottom: 1em;
@@ -16,33 +32,212 @@
       margin: 0;
     }
   }
+}
 
-  .member-map-help {
-    margin-top: 1.5em;
-    padding: 1em 1.25em;
-    background: var(--primary-very-low);
-    border-radius: 6px;
-    font-size: 0.9em;
+// Activity log section
+.member-map-activity {
+  margin-top: 1.5em;
+
+  .activity-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+    margin-bottom: 0.75em;
+    flex-wrap: wrap;
 
     h3 {
-      margin: 0 0 0.75em;
+      margin: 0;
       font-size: 1em;
       color: var(--primary-high);
     }
+  }
 
-    ul {
-      margin: 0;
-      padding-left: 1.25em;
+  .activity-filters {
+    display: flex;
+    gap: 0.25em;
+  }
 
-      li {
-        margin-bottom: 0.4em;
-        color: var(--primary-medium);
+  .activity-filter-btn {
+    padding: 0.25em 0.6em;
+    border: 1px solid var(--primary-low);
+    border-radius: 4px;
+    background: var(--secondary);
+    color: var(--primary-medium);
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: all 0.15s;
 
-        &:last-child {
-          margin-bottom: 0;
-        }
+    &:hover {
+      background: var(--primary-very-low);
+      color: var(--primary);
+    }
+
+    &.active {
+      background: var(--tertiary);
+      border-color: var(--tertiary);
+      color: var(--secondary);
+    }
+  }
+
+  .activity-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .activity-entry {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    padding: 0.35em 0;
+    border-bottom: 1px solid var(--primary-low);
+    font-size: 0.875em;
+    line-height: 1.4;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &.new {
+      .activity-content {
+        font-weight: 600;
       }
     }
+
+    .activity-time {
+      flex-shrink: 0;
+      min-width: 3em;
+      font-size: 0.85em;
+      color: var(--primary-medium);
+    }
+
+    .activity-content {
+      color: var(--primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .activity-user {
+      color: var(--tertiary);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    .activity-location,
+    .activity-poi {
+      color: var(--tertiary);
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .activity-empty {
+    color: var(--primary-medium);
+    font-size: 0.9em;
+    margin: 0;
+  }
+}
+
+// Help overlay
+.member-map-help-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeInOverlay 0.15s ease;
+}
+
+.member-map-help-modal {
+  position: relative;
+  background: var(--secondary);
+  border-radius: 8px;
+  padding: 1.5em 2em;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  animation: modalFadeIn 0.2s ease;
+
+  h3 {
+    margin: 0 0 1em;
+    font-size: 1.1em;
+    color: var(--primary);
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1.25em;
+
+    li {
+      margin-bottom: 0.5em;
+      color: var(--primary-high);
+      line-height: 1.5;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+}
+
+.member-map-help-close {
+  position: absolute;
+  top: 0.75em;
+  right: 0.75em;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--primary-medium);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.1s, color 0.1s;
+
+  &:hover {
+    background: var(--primary-very-low);
+    color: var(--primary);
+  }
+
+  .d-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 

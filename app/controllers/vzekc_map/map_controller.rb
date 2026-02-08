@@ -9,15 +9,14 @@ module VzekcMap
 
     # GET /vzekc-map/locations.json
     #
-    # Returns a list of all member locations for displaying on the map
+    # Returns a list of all member locations for displaying on the map,
+    # plus recent activity data for the activity log
     #
     # @return [JSON] {
-    #   locations: [
-    #     {
-    #       user: { id, username, name, avatar_template },
-    #       coordinates: [{ lat, lng, zoom }]
-    #     }
-    #   ]
+    #   locations: [...],
+    #   user_changes: [...],
+    #   poi_changes: [...],
+    #   last_visit: "ISO8601 timestamp"
     # }
     def locations
       # Query users with Geoinformation custom field
@@ -46,7 +45,85 @@ module VzekcMap
         }
       end
 
-      render json: { locations: locations }
+      # Get last 20 user location changes
+      user_changes = UserCustomField
+        .where(name: "Geoinformation")
+        .where.not(value: [nil, ""])
+        .includes(:user)
+        .order(updated_at: :desc)
+        .limit(20)
+        .filter_map do |ucf|
+          next unless ucf.user
+          coords = GeoParser.parse(ucf.value).first
+          next unless coords
+          # Use threshold of 1 day - consider it "added" if updated within a day of creation
+          is_new = (ucf.updated_at - ucf.created_at).abs < 1.day
+          {
+            type: is_new ? "added" : "updated",
+            user: { id: ucf.user.id, username: ucf.user.username, name: ucf.user.name },
+            location: coords,
+            timestamp: ucf.updated_at.iso8601
+          }
+        end
+
+      # Get last 20 POI changes
+      poi_changes = []
+      poi_category_id = SiteSetting.vzekc_map_poi_category_id
+      if poi_category_id.present?
+        poi_changes = Topic
+          .where(category_id: poi_category_id)
+          .where(deleted_at: nil)
+          .includes(:user)
+          .order(updated_at: :desc)
+          .limit(20)
+          .filter_map do |topic|
+            next unless topic.user
+            coords_str = topic.custom_fields["vzekc_map_coordinates"]
+            coords = coords_str.present? ? GeoParser.parse(coords_str).first : nil
+            # Use threshold of 1 day - consider it "added" if updated within a day of creation
+            is_new = (topic.updated_at - topic.created_at).abs < 1.day
+            {
+              type: is_new ? "added" : "updated",
+              topic_id: topic.id,
+              title: topic.title,
+              slug: topic.slug,
+              user: { id: topic.user_id, username: topic.user.username, name: topic.user.name },
+              location: coords,
+              timestamp: topic.updated_at.iso8601
+            }
+          end
+      end
+
+      # Get user's last visit and update it
+      last_visit = nil
+      if current_user
+        last_visit = current_user.custom_fields["vzekc_map_last_visit"]
+        current_user.custom_fields["vzekc_map_last_visit"] = Time.now.iso8601
+        current_user.save_custom_fields
+      end
+
+      render json: {
+        locations: locations,
+        user_changes: user_changes,
+        poi_changes: poi_changes,
+        last_visit: last_visit
+      }
+    end
+
+    # GET /vzekc-map/has-new-content.json
+    #
+    # Fast endpoint for sidebar indicator - checks if there's new activity since last visit
+    def has_new_content
+      return render json: { has_new: false } unless current_user
+
+      last_visit = current_user.custom_fields["vzekc_map_last_visit"]
+      return render json: { has_new: true } unless last_visit
+
+      last_activity = PluginStore.get("vzekc-map", "last_activity")
+      return render json: { has_new: false } unless last_activity
+
+      has_new = Time.parse(last_activity) > Time.parse(last_visit)
+      render json: { has_new: has_new }
     end
 
     # POST /vzekc-map/locations.json
