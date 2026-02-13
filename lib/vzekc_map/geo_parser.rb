@@ -20,8 +20,18 @@ module VzekcMap
 
       locations = []
 
-      # Split by whitespace to handle multiple locations
-      parts = geo_string.strip.split(/\s+/)
+      # Split by whitespace to handle multiple locations, but rejoin parts
+      # where a trailing comma indicates the space was inside coordinates
+      # (e.g. "geo:52.53, 13.39" should not be split)
+      raw_parts = geo_string.strip.split(/\s+/)
+      parts = []
+      raw_parts.each do |part|
+        if parts.last&.end_with?(",")
+          parts[-1] = "#{parts.last}#{part}"
+        else
+          parts << part
+        end
+      end
 
       parts.each do |part|
         location = parse_single(part)
