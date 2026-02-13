@@ -38,7 +38,7 @@ module ::VzekcMap
 
     # Get all member user IDs
     members_group_name = SiteSetting.vzekc_map_members_group_name
-    return unless members_group_name.present?
+    return if members_group_name.blank?
 
     group = Group.find_by(name: members_group_name)
     return unless group

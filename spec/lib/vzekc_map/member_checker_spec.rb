@@ -4,8 +4,8 @@ require "rails_helper"
 
 RSpec.describe VzekcMap::MemberChecker do
   fab!(:member_group) { Fabricate(:group, name: "vereinsmitglieder") }
-  fab!(:member_user) { Fabricate(:user) }
-  fab!(:non_member_user) { Fabricate(:user) }
+  fab!(:member_user, :user)
+  fab!(:non_member_user, :user)
 
   before do
     member_group.add(member_user)

@@ -21,8 +21,8 @@ module VzekcMap
     def locations
       # Query users with Geoinformation custom field
       user_fields = UserCustomField.where(name: "Geoinformation")
-                                   .where.not(value: [nil, ""])
-                                   .includes(:user)
+        .where.not(value: [nil, ""])
+        .includes(:user)
 
       locations = []
 
@@ -140,7 +140,7 @@ module VzekcMap
 
       # Validate coordinates
       unless GeoParser.send(:valid_coordinates?, lat, lng)
-        return render json: { error: I18n.t("vzekc_map.errors.invalid_coordinates") }, status: 422
+        return render json: { error: I18n.t("vzekc_map.errors.invalid_coordinates") }, status: :unprocessable_content
       end
 
       # Reverse geocode to get location name
@@ -185,7 +185,7 @@ module VzekcMap
 
       # Validate index
       if index < 0 || index >= coordinates.length
-        return render json: { error: I18n.t("vzekc_map.errors.invalid_location_index") }, status: 422
+        return render json: { error: I18n.t("vzekc_map.errors.invalid_location_index") }, status: :unprocessable_content
       end
 
       # Remove the location at index by rebuilding the geo string
@@ -230,12 +230,12 @@ module VzekcMap
       return render json: { pois: [] } if category_id.blank?
 
       topics = Topic.where(category_id: category_id)
-                    .where(deleted_at: nil)
-                    .includes(:user)
+        .where(deleted_at: nil)
+        .includes(:user)
 
       pois = topics.filter_map do |topic|
         coords_str = topic.custom_fields["vzekc_map_coordinates"]
-        next unless coords_str.present?
+        next if coords_str.blank?
 
         coords = GeoParser.parse(coords_str).first
         next unless coords

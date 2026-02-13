@@ -4,8 +4,8 @@ require "rails_helper"
 
 RSpec.describe VzekcMap::MapController do
   fab!(:member_group) { Fabricate(:group, name: "vereinsmitglieder") }
-  fab!(:member_user) { Fabricate(:user) }
-  fab!(:non_member_user) { Fabricate(:user) }
+  fab!(:member_user, :user)
+  fab!(:non_member_user, :user)
 
   before do
     SiteSetting.vzekc_map_enabled = true
@@ -43,7 +43,7 @@ RSpec.describe VzekcMap::MapController do
       end
 
       context "with users having geoinformation" do
-        fab!(:user_with_geo) { Fabricate(:user) }
+        fab!(:user_with_geo, :user)
 
         before do
           UserCustomField.create!(
