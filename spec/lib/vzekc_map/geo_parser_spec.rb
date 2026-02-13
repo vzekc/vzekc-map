@@ -7,73 +7,73 @@ RSpec.describe VzekcMap::GeoParser do
     context "with geo: URI format" do
       it "parses geo:lat,lng?z=zoom format" do
         result = described_class.parse("geo:52.535150,13.394236?z=19")
-        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: 19 }])
+        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: 19, name: nil }])
       end
 
       it "parses geo:lat,lng format without zoom" do
         result = described_class.parse("geo:50.800411,6.914046")
-        expect(result).to eq([{ lat: 50.800411, lng: 6.914046, zoom: nil }])
+        expect(result).to eq([{ lat: 50.800411, lng: 6.914046, zoom: nil, name: nil }])
       end
 
       it "parses geo: lat,lng format with space after colon" do
         result = described_class.parse("geo: 49.536401,8.350006")
-        expect(result).to eq([{ lat: 49.536401, lng: 8.350006, zoom: nil }])
+        expect(result).to eq([{ lat: 49.536401, lng: 8.350006, zoom: nil, name: nil }])
       end
 
       it "handles space around comma in coordinates" do
         result = described_class.parse("geo:52.535150, 13.394236")
-        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: nil }])
+        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: nil, name: nil }])
       end
     end
 
     context "with typos" do
       it "parses eo: typo (missing g)" do
         result = described_class.parse("eo:52.535150,13.394236")
-        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: nil }])
+        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: nil, name: nil }])
       end
 
       it "parses Geo: with capital G" do
         result = described_class.parse("Geo:52.535150,13.394236")
-        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: nil }])
+        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: nil, name: nil }])
       end
 
       it "parses GEO: all caps" do
         result = described_class.parse("GEO:52.535150,13.394236?z=10")
-        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: 10 }])
+        expect(result).to eq([{ lat: 52.535150, lng: 13.394236, zoom: 10, name: nil }])
       end
     end
 
     context "with raw coordinates" do
       it "parses raw lat,lng format" do
         result = described_class.parse("50.554224,9.676251")
-        expect(result).to eq([{ lat: 50.554224, lng: 9.676251, zoom: nil }])
+        expect(result).to eq([{ lat: 50.554224, lng: 9.676251, zoom: nil, name: nil }])
       end
 
       it "parses negative coordinates" do
         result = described_class.parse("-33.8688,151.2093")
-        expect(result).to eq([{ lat: -33.8688, lng: 151.2093, zoom: nil }])
+        expect(result).to eq([{ lat: -33.8688, lng: 151.2093, zoom: nil, name: nil }])
       end
 
       it "parses coordinates with negative longitude" do
         result = described_class.parse("40.7128,-74.0060")
-        expect(result).to eq([{ lat: 40.7128, lng: -74.0060, zoom: nil }])
+        expect(result).to eq([{ lat: 40.7128, lng: -74.0060, zoom: nil, name: nil }])
       end
     end
 
     context "with OpenStreetMap URLs" do
       it "parses standard OSM URL format" do
         result = described_class.parse("https://www.openstreetmap.org/?#map=19/52.129158/11.604304")
-        expect(result).to eq([{ lat: 52.129158, lng: 11.604304, zoom: 19 }])
+        expect(result).to eq([{ lat: 52.129158, lng: 11.604304, zoom: 19, name: nil }])
       end
 
       it "parses OSM URL with different zoom level" do
         result = described_class.parse("https://www.openstreetmap.org/#map=15/48.8566/2.3522")
-        expect(result).to eq([{ lat: 48.8566, lng: 2.3522, zoom: 15 }])
+        expect(result).to eq([{ lat: 48.8566, lng: 2.3522, zoom: 15, name: nil }])
       end
 
       it "parses OSM URL with negative coordinates" do
         result = described_class.parse("https://www.openstreetmap.org/#map=12/-33.8688/151.2093")
-        expect(result).to eq([{ lat: -33.8688, lng: 151.2093, zoom: 12 }])
+        expect(result).to eq([{ lat: -33.8688, lng: 151.2093, zoom: 12, name: nil }])
       end
     end
 
@@ -81,16 +81,16 @@ RSpec.describe VzekcMap::GeoParser do
       it "parses space-separated geo: URIs" do
         result = described_class.parse("geo:48.886,9.126 geo:48.774,9.239")
         expect(result).to eq([
-          { lat: 48.886, lng: 9.126, zoom: nil },
-          { lat: 48.774, lng: 9.239, zoom: nil }
+          { lat: 48.886, lng: 9.126, zoom: nil, name: nil },
+          { lat: 48.774, lng: 9.239, zoom: nil, name: nil }
         ])
       end
 
       it "parses mixed format locations" do
         result = described_class.parse("geo:52.520,13.405?z=15 50.110,8.682")
         expect(result).to eq([
-          { lat: 52.520, lng: 13.405, zoom: 15 },
-          { lat: 50.110, lng: 8.682, zoom: nil }
+          { lat: 52.520, lng: 13.405, zoom: 15, name: nil },
+          { lat: 50.110, lng: 8.682, zoom: nil, name: nil }
         ])
       end
 
@@ -98,8 +98,8 @@ RSpec.describe VzekcMap::GeoParser do
         input = "https://www.openstreetmap.org/#map=10/52.52/13.40 https://www.openstreetmap.org/#map=12/48.85/2.35"
         result = described_class.parse(input)
         expect(result).to eq([
-          { lat: 52.52, lng: 13.40, zoom: 10 },
-          { lat: 48.85, lng: 2.35, zoom: 12 }
+          { lat: 52.52, lng: 13.40, zoom: 10, name: nil },
+          { lat: 48.85, lng: 2.35, zoom: 12, name: nil }
         ])
       end
     end
@@ -145,34 +145,34 @@ RSpec.describe VzekcMap::GeoParser do
     context "with edge cases" do
       it "handles coordinates at origin" do
         result = described_class.parse("geo:0,0")
-        expect(result).to eq([{ lat: 0.0, lng: 0.0, zoom: nil }])
+        expect(result).to eq([{ lat: 0.0, lng: 0.0, zoom: nil, name: nil }])
       end
 
       it "handles coordinates at max bounds" do
         result = described_class.parse("geo:90,180")
-        expect(result).to eq([{ lat: 90.0, lng: 180.0, zoom: nil }])
+        expect(result).to eq([{ lat: 90.0, lng: 180.0, zoom: nil, name: nil }])
       end
 
       it "handles coordinates at min bounds" do
         result = described_class.parse("geo:-90,-180")
-        expect(result).to eq([{ lat: -90.0, lng: -180.0, zoom: nil }])
+        expect(result).to eq([{ lat: -90.0, lng: -180.0, zoom: nil, name: nil }])
       end
 
       it "handles integer coordinates" do
         result = described_class.parse("52,13")
-        expect(result).to eq([{ lat: 52.0, lng: 13.0, zoom: nil }])
+        expect(result).to eq([{ lat: 52.0, lng: 13.0, zoom: nil, name: nil }])
       end
 
       it "handles extra whitespace around input" do
         result = described_class.parse("  geo:52.52,13.40  ")
-        expect(result).to eq([{ lat: 52.52, lng: 13.40, zoom: nil }])
+        expect(result).to eq([{ lat: 52.52, lng: 13.40, zoom: nil, name: nil }])
       end
 
       it "filters out invalid entries in mixed input" do
         result = described_class.parse("geo:52.52,13.40 invalid geo:48.85,2.35")
         expect(result).to eq([
-          { lat: 52.52, lng: 13.40, zoom: nil },
-          { lat: 48.85, lng: 2.35, zoom: nil }
+          { lat: 52.52, lng: 13.40, zoom: nil, name: nil },
+          { lat: 48.85, lng: 2.35, zoom: nil, name: nil }
         ])
       end
     end
